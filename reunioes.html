@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reuniões — Impulso Web</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<div class="app" id="app">
+  <div class="main" id="mainContent">
+    <div class="page-content" id="pageContent"></div>
+  </div>
+</div>
+
+<!-- Modal Add/Edit Meeting -->
+<div class="modal-overlay" id="reuniaoModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="reuniaoModalTitle">📅 Agendar Reunião</h3>
+      <button class="modal-close">✕</button>
+    </div>
+    <div class="modal-body">
+      <form id="reuniaoForm" novalidate>
+        <input type="hidden" id="reuniaoId">
+        <div class="form-grid">
+          <div class="form-group full">
+            <label>Cliente *</label>
+            <select id="reuniaoClienteId" required>
+              <option value="">Selecione o cliente...</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Data *</label>
+            <input type="date" id="reuniaoData" required>
+          </div>
+          <div class="form-group">
+            <label>Horário *</label>
+            <input type="time" id="reuniaoHorario" required>
+          </div>
+          <div class="form-group">
+            <label>Tipo</label>
+            <select id="reuniaoTipo">
+              <option value="online">🖥️ Online</option>
+              <option value="presencial">🏢 Presencial</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Link (se online)</label>
+            <input type="text" id="reuniaoLink" placeholder="https://meet.google.com/...">
+          </div>
+          <div class="form-group full">
+            <label>Observações</label>
+            <textarea id="reuniaoObs" placeholder="Pauta da reunião..."></textarea>
+          </div>
+        </div>
+      </form>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('reuniaoModal')">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveReuniao()">💾 Salvar</button>
+    </div>
+  </div>
+</div>
+
+<script src="/js/database.js"></script>
+<script src="/js/app.js"></script>
+<script src="/js/layout.js"></script>
+<script>
+let calYear, calMonth;
+
+document.addEventListener('DOMContentLoaded', () => {
+  injectLayout('Reuniões', 'Gerencie seus agendamentos');
+  const now = new Date();
+  calYear = now.getFullYear();
+  calMonth = now.getMonth();
+  renderPage();
+});
+
+function renderPage() {
+  const pc = document.getElementById('pageContent');
+  pc.innerHTML = `
+    <div class="page-header">
+      <div class="breadcrumb"><span>Home</span><span>Reuniões</span></div>
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
+        <div><h2>📅 Reuniões</h2><p>Gerencie e visualize seus agendamentos</p></div>
+        <button class="btn btn-primary" onclick="openNewReuniao()">➕ Nova Reunião</button>
+      </div>
+    </div>
+
+    <div class="grid-2-1">
+      <div>
+        <!-- Upcoming meetings -->
+        <div class="card" style="margin-bottom:20px">
+          <div class="card-header">
+            <h3>⏰ Próximas Reuniões</h3>
+            <span id="countBadge" class="tag">0</span>
+          </div>
+          <div class="card-body" style="padding:12px 16px" id="upcomingList"></div>
+        </div>
+        <!-- All meetings -->
+        <div class="card">
+          <div class="card-header">
+            <h3>📋 Todas as Reuniões</h3>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Cliente</th><th>Data</th><th>Horário</th><th>Tipo</th><th>Obs</th><th>Ações</th></tr></thead>
+              <tbody id="reunioesTable"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Calendar -->
+      <div>
+        <div class="card" style="margin-bottom:20px">
+          <div class="card-header"><h3>🗓️ Calendário</h3></div>
+          <div class="card-body">
+            <div class="mini-calendar" id="miniCal"></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header"><h3>📊 Estatísticas</h3></div>
+          <div class="card-body" id="statsBox"></div>
+        </div>
+      </div>
+    </div>`;
+
+  populateClienteSelect();
+  renderReunioes();
+  renderCalendar();
+}
+
+function renderReunioes() {
+  const reunioes = DB.getReunioes().sort((a,b) => new Date(a.data+' '+a.horario) - new Date(b.data+' '+b.horario));
+  const today = new Date().toISOString().slice(0,10);
+
+  const upcoming = reunioes.filter(r => r.data >= today).slice(0,5);
+  document.getElementById('countBadge').textContent = upcoming.length;
+
+  const ul = document.getElementById('upcomingList');
+  if (!upcoming.length) {
+    ul.innerHTML = '<div class="empty-state" style="padding:20px"><div class="empty-icon">📅</div><p>Sem reuniões futuras</p></div>';
+  } else {
+    ul.innerHTML = upcoming.map(r => `
+      <div class="meeting-card" style="margin-bottom:8px">
+        <div class="meeting-time">
+          <div class="time">${r.horario}</div>
+          <div class="date">${FMT.date(r.data)}</div>
+        </div>
+        <div class="meeting-divider"></div>
+        <div class="meeting-info" style="flex:1">
+          <div class="meeting-name">${r.clienteNome}</div>
+          <div class="meeting-type">${r.tipo==='online'?'🖥️ Online':'🏢 Presencial'}</div>
+        </div>
+        <div style="display:flex;gap:6px">
+          ${r.link ? `<a href="${r.link}" target="_blank" class="btn btn-sm btn-ghost">🔗</a>` : ''}
+          <button class="btn btn-sm btn-ghost" onclick="editReuniao('${r.id}')">✏️</button>
+        </div>
+      </div>`).join('');
+  }
+
+  const tbody = document.getElementById('reunioesTable');
+  if (!reunioes.length) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:32px;color:var(--text3)">Sem reuniões agendadas</td></tr>';
+  } else {
+    tbody.innerHTML = reunioes.map(r => `
+      <tr>
+        <td><span style="font-weight:600;color:var(--white)">${r.clienteNome}</span></td>
+        <td>${FMT.date(r.data)}</td>
+        <td><span style="color:var(--gold)">${r.horario}</span></td>
+        <td><span class="badge ${r.tipo==='online'?'status-cliente':'status-fechado'}">${r.tipo==='online'?'🖥️ Online':'🏢 Presencial'}</span></td>
+        <td style="color:var(--text3);font-size:12px;max-width:160px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.obs||'—'}</td>
+        <td>
+          <div style="display:flex;gap:6px">
+            ${r.link?`<a href="${r.link}" target="_blank" class="btn btn-sm btn-ghost">🔗</a>`:''}
+            <button class="btn btn-sm btn-ghost" onclick="editReuniao('${r.id}')">✏️</button>
+            <button class="btn btn-sm btn-danger" onclick="deleteReuniao('${r.id}')">🗑️</button>
+          </div>
+        </td>
+      </tr>`).join('');
+  }
+
+  // Stats
+  const stats = document.getElementById('statsBox');
+  const total = reunioes.length;
+  const online = reunioes.filter(r=>r.tipo==='online').length;
+  const passadas = reunioes.filter(r=>r.data < today).length;
+  stats.innerHTML = `
+    ${[
+      ['Total de Reuniões', total, '📅'],
+      ['Online', online, '🖥️'],
+      ['Presenciais', total-online, '🏢'],
+      ['Passadas', passadas, '✅'],
+      ['Futuras', total-passadas, '⏰'],
+    ].map(([l,v,i])=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border2)">
+      <span style="font-size:13px;color:var(--text2)">${i} ${l}</span>
+      <span style="font-family:var(--font-display);font-size:1.1rem;color:var(--gold)">${v}</span>
+    </div>`).join('')}`;
+}
+
+function renderCalendar() {
+  const calEl = document.getElementById('miniCal');
+  const reunioes = DB.getReunioes();
+  const eventDates = new Set(reunioes.map(r => r.data));
+  const today = new Date();
+
+  const firstDay = new Date(calYear, calMonth, 1);
+  const daysInMonth = new Date(calYear, calMonth+1, 0).getDate();
+  const startDow = firstDay.getDay();
+  const monthName = firstDay.toLocaleDateString('pt-BR',{month:'long',year:'numeric'});
+
+  const days = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+  let html = `
+    <div class="cal-header">
+      <button class="cal-nav" onclick="changeMonth(-1)">‹</button>
+      <span style="text-transform:capitalize">${monthName}</span>
+      <button class="cal-nav" onclick="changeMonth(1)">›</button>
+    </div>
+    <div class="cal-grid">
+      ${days.map(d=>`<div class="cal-day-label">${d}</div>`).join('')}
+      ${Array(startDow).fill('<div class="cal-day other-month"></div>').join('')}
+      ${Array.from({length:daysInMonth},(_,i)=>{
+        const day = i+1;
+        const dateStr = `${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+        const isToday = today.getDate()===day && today.getMonth()===calMonth && today.getFullYear()===calYear;
+        const hasEvent = eventDates.has(dateStr);
+        return `<div class="cal-day ${isToday?'today':''} ${hasEvent?'has-event':''}" title="${hasEvent?'Reunião agendada':''}">${day}</div>`;
+      }).join('')}
+    </div>`;
+  calEl.innerHTML = html;
+}
+
+function changeMonth(dir) {
+  calMonth += dir;
+  if (calMonth > 11) { calMonth = 0; calYear++; }
+  if (calMonth < 0) { calMonth = 11; calYear--; }
+  renderCalendar();
+}
+
+function populateClienteSelect() {
+  const sel = document.getElementById('reuniaoClienteId');
+  const clientes = DB.getClientes().sort((a,b)=>a.nome.localeCompare(b.nome));
+  sel.innerHTML = '<option value="">Selecione o cliente...</option>' +
+    clientes.map(c=>`<option value="${c.id}" data-nome="${c.nome}">${c.nome} ${c.empresa?'('+c.empresa+')':''}</option>`).join('');
+}
+
+function openNewReuniao() {
+  document.getElementById('reuniaoId').value = '';
+  document.getElementById('reuniaoModalTitle').textContent = '📅 Agendar Reunião';
+  document.getElementById('reuniaoForm').reset();
+  document.getElementById('reuniaoData').value = new Date().toISOString().slice(0,10);
+  openModal('reuniaoModal');
+}
+
+function editReuniao(id) {
+  const r = DB.getReunioes().find(x=>x.id===id);
+  if (!r) return;
+  document.getElementById('reuniaoId').value = r.id;
+  document.getElementById('reuniaoModalTitle').textContent = '✏️ Editar Reunião';
+  document.getElementById('reuniaoClienteId').value = r.clienteId;
+  document.getElementById('reuniaoData').value = r.data;
+  document.getElementById('reuniaoHorario').value = r.horario;
+  document.getElementById('reuniaoTipo').value = r.tipo;
+  document.getElementById('reuniaoLink').value = r.link||'';
+  document.getElementById('reuniaoObs').value = r.obs||'';
+  openModal('reuniaoModal');
+}
+
+function saveReuniao() {
+  const id = document.getElementById('reuniaoId').value;
+  const clienteEl = document.getElementById('reuniaoClienteId');
+  const clienteId = clienteEl.value;
+  const clienteNome = clienteEl.selectedOptions[0]?.getAttribute('data-nome') || '';
+  const data = {
+    clienteId, clienteNome,
+    data: document.getElementById('reuniaoData').value,
+    horario: document.getElementById('reuniaoHorario').value,
+    tipo: document.getElementById('reuniaoTipo').value,
+    link: document.getElementById('reuniaoLink').value,
+    obs: document.getElementById('reuniaoObs').value,
+  };
+  if (!clienteId || !data.data || !data.horario) { toast('Preencha os campos obrigatórios!', 'error'); return; }
+  if (id) { DB.updateReuniao(id, data); toast('Reunião atualizada!', 'success'); }
+  else { DB.addReuniao(data); toast('Reunião agendada!', 'success'); DB.addNotif(`Reunião com ${clienteNome} agendada 📅`, 'info'); }
+  closeModal('reuniaoModal');
+  renderReunioes();
+  renderCalendar();
+}
+
+function deleteReuniao(id) {
+  confirm('Excluir esta reunião?', () => {
+    DB.deleteReuniao(id);
+    toast('Reunião removida.', 'info');
+    renderReunioes();
+    renderCalendar();
+  });
+}
+</script>
+</body>
+</html>

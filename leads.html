@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Leads — Impulso Web</title>
+<link rel="stylesheet" href="/css/style.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+<div class="app" id="app">
+  <div class="main" id="mainContent">
+    <div class="page-content" id="pageContent"></div>
+  </div>
+</div>
+
+<script src="/js/database.js"></script>
+<script src="/js/app.js"></script>
+<script src="/js/layout.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  injectLayout('Leads', 'Acompanhe a conversão de leads');
+  renderPage();
+});
+
+function renderPage() {
+  const clientes = DB.getClientes();
+  const leads = clientes.filter(c => c.status === 'lead');
+  const aguardando = clientes.filter(c => c.status === 'aguardando');
+  const fechados = clientes.filter(c => c.status === 'fechado');
+  const desistentes = clientes.filter(c => c.status === 'desistente');
+  const totalAtivos = leads.length + aguardando.length;
+  const taxaConv = clientes.length > 0 ? ((fechados.length / clientes.length)*100).toFixed(1) : 0;
+  const valorPipeline = leads.concat(aguardando).reduce((a,c)=>a+Number(c.valor||0),0);
+
+  const pc = document.getElementById('pageContent');
+  pc.innerHTML = `
+    <div class="page-header">
+      <div class="breadcrumb"><span>Home</span><span>Leads</span></div>
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
+        <div><h2>📈 Pipeline de Leads</h2><p>Acompanhe o funil de conversão</p></div>
+        <a href="/cadastro-cliente.html" class="btn btn-primary">➕ Novo Lead</a>
+      </div>
+    </div>
+
+    <div class="stats-grid">
+      <div class="stat-card"><div class="stat-icon">📈</div><div class="stat-label">Leads Ativos</div><div class="stat-value">${totalAtivos}</div></div>
+      <div class="stat-card"><div class="stat-icon">🟢</div><div class="stat-label">Fechados</div><div class="stat-value">${fechados.length}</div></div>
+      <div class="stat-card"><div class="stat-icon">🎯</div><div class="stat-label">Taxa de Conversão</div><div class="stat-value">${taxaConv}%</div></div>
+      <div class="stat-card"><div class="stat-icon">💰</div><div class="stat-label">Valor no Pipeline</div><div class="stat-value" style="font-size:1.2rem">${FMT.currency(valorPipeline)}</div></div>
+    </div>
+
+    <div class="grid-2-1" style="margin-bottom:20px">
+      <div>
+        <!-- Funil visual -->
+        <div class="card" style="margin-bottom:20px">
+          <div class="card-header"><h3>🎯 Funil de Vendas</h3></div>
+          <div class="card-body">
+            ${[
+              { label: '🟡 Leads', count: leads.length, color: '#facc15', w: 100 },
+              { label: '🟠 Aguardando', count: aguardando.length, color: '#fb923c', w: 75 },
+              { label: '🟢 Fechados', count: fechados.length, color: '#4ade80', w: 50 },
+            ].map(f => `
+              <div style="margin-bottom:14px">
+                <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px">
+                  <span>${f.label}</span>
+                  <span style="font-weight:700;color:${f.color}">${f.count}</span>
+                </div>
+                <div class="progress-wrap" style="height:22px;border-radius:6px">
+                  <div style="height:100%;border-radius:6px;background:${f.color}22;border:1px solid ${f.color}44;width:${f.count>0?Math.max(5,(f.count/Math.max(leads.length,1)*f.w)):5}%;
+                  display:flex;align-items:center;padding-left:8px;font-size:11px;color:${f.color};font-weight:700;transition:width .8s ease;">
+                    ${f.count > 0 ? f.count : ''}
+                  </div>
+                </div>
+              </div>`).join('')}
+          </div>
+        </div>
+
+        <!-- Chart -->
+        <div class="card">
+          <div class="card-header"><h3>📊 Faturamento Estimado por Serviço</h3></div>
+          <div class="card-body">
+            <div class="chart-wrap"><canvas id="chartServicos"></canvas></div>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <!-- Leads Recentes -->
+        <div class="card" style="margin-bottom:20px">
+          <div class="card-header"><h3>🟡 Leads Ativos</h3><a href="/clientes.html" style="font-size:12px">Ver todos →</a></div>
+          <div class="card-body" style="padding:8px">
+            ${leads.slice(0,6).map(c => {
+              const pr = PRIORIDADE[c.prioridade]||PRIORIDADE.normal;
+              return `<div style="display:flex;align-items:center;gap:10px;padding:10px;border-radius:var(--radius2);margin-bottom:4px;transition:background .2s;cursor:default;border:1px solid transparent" onmouseover="this.style.background='var(--black3)';this.style.borderColor='var(--border)'" onmouseout="this.style.background='';this.style.borderColor='transparent'">
+                <div class="user-avatar" style="width:34px;height:34px;font-size:13px">${c.nome[0]}</div>
+                <div style="flex:1">
+                  <div style="font-weight:600;font-size:13px;color:var(--white)">${c.nome}</div>
+                  <div style="font-size:11px;color:var(--text3)">${c.servico||'—'} • ${FMT.currency(c.valor)}</div>
+                </div>
+                <div style="display:flex;gap:6px;align-items:center">
+                  <span class="badge ${pr.cls}" style="font-size:10px">${pr.label}</span>
+                  <button class="btn btn-sm btn-whatsapp" onclick="openWhatsApp('${c.telefone}','${c.nome}')">💬</button>
+                </div>
+              </div>`;
+            }).join('') || '<div class="empty-state" style="padding:20px"><p>Sem leads ativos</p></div>'}
+          </div>
+        </div>
+
+        <!-- Desistentes -->
+        <div class="card">
+          <div class="card-header"><h3>🔴 Últimas Perdas</h3></div>
+          <div class="card-body" style="padding:8px">
+            ${desistentes.slice(0,4).map(c => `
+              <div style="display:flex;align-items:center;gap:10px;padding:10px;border-radius:var(--radius2);margin-bottom:4px">
+                <div class="user-avatar" style="width:30px;height:30px;font-size:12px;background:rgba(239,68,68,0.15);color:#f87171">${c.nome[0]}</div>
+                <div style="flex:1">
+                  <div style="font-size:13px;color:var(--text)">${c.nome}</div>
+                  <div style="font-size:11px;color:var(--text3)">${c.servico||'—'}</div>
+                </div>
+                <span style="font-size:12px;color:#f87171">${FMT.currency(c.valor)}</span>
+              </div>`).join('') || '<div style="padding:16px;text-align:center;color:var(--text3);font-size:13px">Nenhuma perda registrada 🎉</div>'}
+          </div>
+        </div>
+      </div>
+    </div>`;
+
+  initServiceChart(clientes);
+}
+
+function initServiceChart(clientes) {
+  const serviceCounts = {};
+  clientes.forEach(c => {
+    const s = c.servico || 'Outro';
+    serviceCounts[s] = (serviceCounts[s]||0) + Number(c.valor||0);
+  });
+  const labels = Object.keys(serviceCounts).slice(0,6);
+  const values = labels.map(l => serviceCounts[l]);
+  const colors = ['#D4AF37','#facc15','#fb923c','#4ade80','#60a5fa','#a78bfa'];
+
+  new Chart(document.getElementById('chartServicos'), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Valor (R$)',
+        data: values,
+        backgroundColor: colors.map(c => c+'33'),
+        borderColor: colors,
+        borderWidth: 1.5,
+        borderRadius: 8,
+        hoverBackgroundColor: colors.map(c => c+'55'),
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      indexAxis: 'y',
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { color: 'rgba(212,175,55,0.06)' }, ticks: { callback: v => 'R$'+Number(v/1000).toFixed(0)+'k' } },
+        y: { grid: { display: false } }
+      }
+    }
+  });
+}
+</script>
+</body>
+</html>

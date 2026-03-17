@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Configurações — Impulso Web</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<div class="app" id="app">
+  <div class="main" id="mainContent">
+    <div class="page-content" id="pageContent"></div>
+  </div>
+</div>
+
+<script src="/js/database.js"></script>
+<script src="/js/app.js"></script>
+<script src="/js/layout.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  injectLayout('Configurações', 'Personalize o sistema');
+  renderPage();
+});
+
+function renderPage() {
+  const user = AUTH.current();
+  const clientes = DB.getClientes();
+  const projetos = DB.getProjetos();
+  const reunioes = DB.getReunioes();
+
+  const pc = document.getElementById('pageContent');
+  pc.innerHTML = `
+    <div class="page-header">
+      <div class="breadcrumb"><span>Home</span><span>Configurações</span></div>
+      <h2>⚙️ Configurações</h2>
+    </div>
+
+    <div class="grid-2">
+      <!-- Perfil -->
+      <div class="card">
+        <div class="card-header"><h3>👤 Perfil do Usuário</h3></div>
+        <div class="card-body">
+          <div style="display:flex;align-items:center;gap:16px;margin-bottom:20px">
+            <div class="user-avatar" style="width:60px;height:60px;font-size:22px">${(user?.nome||'A')[0]}</div>
+            <div>
+              <div style="font-family:var(--font-display);font-size:1.2rem;color:var(--white)">${user?.nome||'Admin'}</div>
+              <div style="font-size:12px;color:var(--text3)">${user?.email||''}</div>
+              <div style="font-size:11px;color:var(--gold);margin-top:4px">Administrador</div>
+            </div>
+          </div>
+          <div class="form-group" style="margin-bottom:12px">
+            <label>Nome</label>
+            <input type="text" value="${user?.nome||''}" placeholder="Seu nome" id="cfgNome">
+          </div>
+          <div class="form-group" style="margin-bottom:16px">
+            <label>Email</label>
+            <input type="email" value="${user?.email||''}" placeholder="email@empresa.com" id="cfgEmail" disabled style="opacity:.6;cursor:not-allowed">
+          </div>
+          <button class="btn btn-primary btn-full" onclick="toast('Perfil atualizado!','success')">💾 Salvar Perfil</button>
+        </div>
+      </div>
+
+      <!-- Dados do sistema -->
+      <div class="card">
+        <div class="card-header"><h3>📊 Resumo de Dados</h3></div>
+        <div class="card-body">
+          ${[
+            ['👥 Clientes cadastrados', clientes.length],
+            ['📁 Projetos criados', projetos.length],
+            ['📅 Reuniões agendadas', reunioes.length],
+            ['🟡 Leads ativos', clientes.filter(c=>c.status==='lead').length],
+            ['🟢 Fechados', clientes.filter(c=>c.status==='fechado').length],
+            ['💰 Faturamento estimado', FMT.currency(clientes.filter(c=>c.status==='fechado').reduce((a,c)=>a+Number(c.valor||0),0))],
+          ].map(([l,v])=>`<div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border2);font-size:13px">
+            <span style="color:var(--text2)">${l}</span>
+            <span style="color:var(--gold);font-weight:700">${v}</span>
+          </div>`).join('')}
+        </div>
+      </div>
+
+      <!-- Exportar -->
+      <div class="card">
+        <div class="card-header"><h3>📥 Exportar Dados</h3></div>
+        <div class="card-body">
+          <p style="margin-bottom:16px;font-size:13px">Exporte seus dados em formato CSV para backup ou análise externa.</p>
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <button class="btn btn-secondary btn-full" onclick="exportar('clientes')">📥 Exportar Clientes (CSV)</button>
+            <button class="btn btn-secondary btn-full" onclick="exportar('projetos')">📥 Exportar Projetos (CSV)</button>
+            <button class="btn btn-secondary btn-full" onclick="exportar('reunioes')">📥 Exportar Reuniões (CSV)</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Perigo -->
+      <div class="card" style="border-color:rgba(239,68,68,0.2)">
+        <div class="card-header" style="border-color:rgba(239,68,68,0.2)"><h3 style="color:#f87171">⚠️ Zona de Risco</h3></div>
+        <div class="card-body">
+          <p style="margin-bottom:16px;font-size:13px">Ações irreversíveis. Tenha certeza antes de prosseguir.</p>
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <button class="btn btn-danger btn-full" onclick="limparNotifs()">🔔 Limpar todas as notificações</button>
+            <button class="btn btn-danger btn-full" onclick="resetarDados()">🗑️ Resetar todos os dados</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Info -->
+    <div class="card" style="margin-top:20px">
+      <div class="card-header"><h3>ℹ️ Sobre o Sistema</h3></div>
+      <div class="card-body">
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px">
+          ${[
+            ['🚀 Sistema', 'Impulso Web CRM'],
+            ['📌 Versão', '1.0.0'],
+            ['💾 Armazenamento', 'LocalStorage'],
+            ['🌐 Ambiente', 'Front-end Puro'],
+            ['📱 Responsivo', 'Sim, 100%'],
+            ['🔒 Auth', 'Sessão local'],
+          ].map(([l,v])=>`<div style="background:var(--black3);border:1px solid var(--border);border-radius:var(--radius2);padding:12px">
+            <div style="font-size:11px;color:var(--text3);margin-bottom:4px">${l}</div>
+            <div style="font-weight:600;color:var(--white);font-size:13px">${v}</div>
+          </div>`).join('')}
+        </div>
+      </div>
+    </div>`;
+}
+
+function exportar(tipo) {
+  if (tipo === 'clientes') {
+    const data = DB.getClientes().map(c => ({ Nome: c.nome, Email: c.email||'', Telefone: c.telefone||'', Empresa: c.empresa||'', Servico: c.servico||'', Valor: c.valor||0, Status: c.status, Prioridade: c.prioridade, DataCadastro: FMT.date(c.dataCadastro) }));
+    exportCSV(data, 'clientes.csv');
+  } else if (tipo === 'projetos') {
+    const data = DB.getProjetos().map(p => ({ Cliente: p.clienteNome, Tipo: p.tipo||'', Valor: p.valor||0, Status: p.statusProjeto, Progresso: p.progresso+'%', DataInicio: FMT.date(p.dataInicio), Prazo: p.prazo+'dias' }));
+    exportCSV(data, 'projetos.csv');
+  } else {
+    const data = DB.getReunioes().map(r => ({ Cliente: r.clienteNome, Data: FMT.date(r.data), Horario: r.horario, Tipo: r.tipo, Link: r.link||'', Obs: r.obs||'' }));
+    exportCSV(data, 'reunioes.csv');
+  }
+}
+
+function limparNotifs() {
+  confirm('Limpar todas as notificações?', () => {
+    localStorage.removeItem('iw_notifs');
+    toast('Notificações limpas!', 'success');
+    updateNotifBadge();
+  });
+}
+
+function resetarDados() {
+  confirm('⚠️ <strong>ATENÇÃO:</strong> Isso irá apagar TODOS os dados (clientes, projetos, reuniões). Esta ação é irreversível!', () => {
+    ['iw_clientes','iw_projetos','iw_reunioes','iw_notifs'].forEach(k => localStorage.removeItem(k));
+    toast('Todos os dados foram removidos. Recarregando...', 'info');
+    setTimeout(() => window.location.reload(), 1500);
+  });
+}
+</script>
+</body>
+</html>

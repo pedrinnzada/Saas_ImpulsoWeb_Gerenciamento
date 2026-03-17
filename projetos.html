@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Projetos — Impulso Web</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<div class="app" id="app">
+  <div class="main" id="mainContent">
+    <div class="page-content" id="pageContent"></div>
+  </div>
+</div>
+
+<!-- Modal Add/Edit Projeto -->
+<div class="modal-overlay" id="projetoModal">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <h3 id="projetoModalTitle">📁 Novo Projeto</h3>
+      <button class="modal-close">✕</button>
+    </div>
+    <div class="modal-body">
+      <form id="projetoForm" novalidate>
+        <input type="hidden" id="projetoId">
+        <div class="form-grid">
+          <div class="form-group full">
+            <label>Cliente *</label>
+            <select id="projetoClienteId" required onchange="onClienteChange(this)">
+              <option value="">Selecione o cliente fechado...</option>
+            </select>
+          </div>
+          <div class="form-group full">
+            <label>Tipo de Projeto *</label>
+            <select id="projetoTipo" required></select>
+          </div>
+          <div class="form-group">
+            <label>Valor Final (R$) *</label>
+            <input type="number" id="projetoValor" placeholder="0.00" required>
+          </div>
+          <div class="form-group">
+            <label>Prazo Estimado (dias)</label>
+            <input type="number" id="projetoPrazo" placeholder="30">
+          </div>
+          <div class="form-group">
+            <label>Status do Projeto</label>
+            <select id="projetoStatus"></select>
+          </div>
+          <div class="form-group">
+            <label>Progresso (%)</label>
+            <input type="number" id="projetoProgresso" placeholder="0" min="0" max="100">
+          </div>
+          <div class="form-group full">
+            <label>Observações</label>
+            <textarea id="projetoObs" placeholder="Detalhes do projeto, tecnologias, requisitos..."></textarea>
+          </div>
+        </div>
+      </form>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('projetoModal')">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveProjeto()">💾 Salvar Projeto</button>
+    </div>
+  </div>
+</div>
+
+<!-- Project Detail Modal -->
+<div class="modal-overlay" id="projetoDetailModal">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <h3>📋 Acompanhamento do Projeto</h3>
+      <button class="modal-close">✕</button>
+    </div>
+    <div class="modal-body" id="projetoDetailBody"></div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('projetoDetailModal')">Fechar</button>
+      <button class="btn btn-primary" id="detailEditBtn">✏️ Editar</button>
+    </div>
+  </div>
+</div>
+
+<script src="/js/database.js"></script>
+<script src="/js/app.js"></script>
+<script src="/js/layout.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  injectLayout('Projetos', 'Acompanhe o andamento dos projetos');
+  renderPage();
+});
+
+function renderPage() {
+  const pc = document.getElementById('pageContent');
+  const projetos = DB.getProjetos();
+  const totalValor = projetos.reduce((a,p) => a + Number(p.valor||0), 0);
+  const entregues = projetos.filter(p => p.statusProjeto === 'entregue').length;
+  const emAndamento = projetos.filter(p => p.statusProjeto !== 'entregue').length;
+
+  pc.innerHTML = `
+    <div class="page-header">
+      <div class="breadcrumb"><span>Home</span><span>Projetos</span></div>
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
+        <div><h2>📁 Projetos</h2><p>Acompanhe o progresso e entrega dos projetos</p></div>
+        <button class="btn btn-primary" onclick="openNewProjeto()">➕ Novo Projeto</button>
+      </div>
+    </div>
+
+    <div class="stats-grid" style="grid-template-columns:repeat(4,1fr)">
+      <div class="stat-card"><div class="stat-icon">📁</div><div class="stat-label">Total</div><div class="stat-value">${projetos.length}</div></div>
+      <div class="stat-card"><div class="stat-icon">⚙️</div><div class="stat-label">Em Andamento</div><div class="stat-value">${emAndamento}</div></div>
+      <div class="stat-card"><div class="stat-icon">✅</div><div class="stat-label">Entregues</div><div class="stat-value">${entregues}</div></div>
+      <div class="stat-card"><div class="stat-icon">💰</div><div class="stat-label">Faturamento</div><div class="stat-value" style="font-size:1.2rem">${FMT.currency(totalValor)}</div></div>
+    </div>
+
+    <div id="projetosGrid" class="clients-grid"></div>
+    ${!projetos.length ? `<div class="empty-state"><div class="empty-icon">📁</div><p>Nenhum projeto cadastrado.<br>Marque um cliente como \"Fechado\" para criar um projeto.</p><a href="/clientes.html" class="btn btn-primary" style="margin-top:16px">Ver Clientes</a></div>` : ''}`;
+
+
+  renderProjetos();
+}
+
+function renderProjetos() {
+  const projetos = DB.getProjetos();
+  const grid = document.getElementById('projetosGrid');
+  if (!grid) return;
+  grid.innerHTML = projetos.map(projetoCard).join('');
+}
+
+function projetoCard(p) {
+  const st = PROJ_STATUS[p.statusProjeto] || PROJ_STATUS.planejamento;
+  const pct = p.progresso || st.pct;
+  const dataInicio = FMT.date(p.dataInicio);
+  const prazoFmt = p.prazo ? p.prazo + ' dias' : '—';
+
+  return `
+  <div class="client-card" id="proj-${p.id}">
+    <div class="client-card-header" style="margin-bottom:10px">
+      <div style="display:flex;align-items:center;gap:10px">
+        <div class="client-avatar" style="border-radius:10px">📁</div>
+        <div>
+          <div class="client-name">${p.clienteNome}</div>
+          <div class="client-company">${p.tipo||'—'}</div>
+        </div>
+      </div>
+      <span class="badge status-${p.statusProjeto==='entregue'?'fechado':'cliente'}" style="font-size:10px">${st.label}</span>
+    </div>
+
+    <div style="margin-bottom:12px">
+      <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:6px">
+        <span style="color:var(--text3)">Progresso</span>
+        <span style="color:var(--gold);font-weight:700">${pct}%</span>
+      </div>
+      <div class="progress-wrap"><div class="progress-bar" style="width:${pct}%"></div></div>
+    </div>
+
+    <div class="client-meta" style="margin-bottom:12px">
+      <div class="client-meta-item">💰 <span style="color:var(--gold);font-weight:600">${FMT.currency(p.valor)}</span></div>
+      <div class="client-meta-item">📅 <span>Início: ${dataInicio}</span></div>
+      <div class="client-meta-item">⏱️ <span>Prazo: ${prazoFmt}</span></div>
+    </div>
+
+    <!-- Mini steps -->
+    <div class="proj-steps">
+      ${Object.entries(PROJ_STATUS).map(([key, s]) => {
+        const steps = Object.keys(PROJ_STATUS);
+        const currentIdx = steps.indexOf(p.statusProjeto);
+        const thisIdx = steps.indexOf(key);
+        const isDone = thisIdx < currentIdx;
+        const isActive = key === p.statusProjeto;
+        return `<div class="proj-step ${isDone?'done':''} ${isActive?'active':''}">
+          <div class="step-dot">${isDone?'✓':isActive?'●':''}</div>
+          <div style="font-size:9.5px">${s.label.replace(/[^\w\s]/gu,'').trim()}</div>
+        </div>`;
+      }).join('')}
+    </div>
+
+    <div class="client-actions">
+      <button class="btn btn-sm btn-ghost" style="flex:1" onclick="viewProjeto('${p.id}')">📋 Detalhes</button>
+      <button class="btn btn-sm btn-ghost" onclick="editProjeto('${p.id}')">✏️</button>
+      <button class="btn btn-sm btn-danger" onclick="deleteProjeto('${p.id}')">🗑️</button>
+    </div>
+  </div>`;
+}
+
+function viewProjeto(id) {
+  const p = DB.getProjeto(id);
+  if (!p) return;
+  const steps = Object.keys(PROJ_STATUS);
+  const currentIdx = steps.indexOf(p.statusProjeto);
+
+  document.getElementById('projetoDetailBody').innerHTML = `
+    <div style="margin-bottom:24px">
+      <div style="display:flex;align-items:center;gap:14px;margin-bottom:16px">
+        <div class="client-avatar" style="width:52px;height:52px;font-size:22px;border-radius:12px">📁</div>
+        <div>
+          <div style="font-family:var(--font-display);font-size:1.3rem;color:var(--white)">${p.clienteNome}</div>
+          <div style="font-size:13px;color:var(--text3)">${p.tipo||'Projeto'}</div>
+        </div>
+        <div style="margin-left:auto;text-align:right">
+          <div style="font-family:var(--font-display);font-size:1.8rem;color:var(--gold)">${FMT.currency(p.valor)}</div>
+          <div style="font-size:11px;color:var(--text3)">Valor do contrato</div>
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-bottom:24px">
+      <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:8px">
+        <span style="color:var(--text3)">Progresso geral</span>
+        <span style="color:var(--gold);font-weight:700">${p.progresso||PROJ_STATUS[p.statusProjeto]?.pct||0}%</span>
+      </div>
+      <div class="progress-wrap" style="height:10px"><div class="progress-bar" style="width:${p.progresso||PROJ_STATUS[p.statusProjeto]?.pct||0}%"></div></div>
+    </div>
+
+    <!-- Step tracker -->
+    <div class="proj-steps" style="padding:12px 0">
+      ${steps.map((key, idx) => {
+        const s = PROJ_STATUS[key];
+        const isDone = idx < currentIdx;
+        const isActive = key === p.statusProjeto;
+        return `<div class="proj-step ${isDone?'done':''} ${isActive?'active':''}">
+          <div class="step-dot" style="width:34px;height:34px;font-size:16px">${isDone?'✔':isActive?'🔄':'⏳'}</div>
+          <div style="font-size:10px;margin-top:4px">${s.label.split(' ').slice(1).join(' ')}</div>
+        </div>`;
+      }).join('')}
+    </div>
+
+    <div class="divider"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-top:16px">
+      ${[
+        ['📅 Início', FMT.date(p.dataInicio)],
+        ['⏱️ Prazo', p.prazo ? p.prazo+' dias' : '—'],
+        ['📌 Status', (PROJ_STATUS[p.statusProjeto]||{}).label||p.statusProjeto],
+      ].map(([l,v])=>`<div style="background:var(--black3);border:1px solid var(--border);border-radius:var(--radius2);padding:14px;text-align:center">
+        <div style="font-size:11px;color:var(--text3);margin-bottom:6px">${l}</div>
+        <div style="font-weight:600;color:var(--white)">${v}</div>
+      </div>`).join('')}
+    </div>
+    ${p.obs ? `<div class="divider"></div><p style="font-size:13px;color:var(--text);line-height:1.7">${p.obs}</p>` : ''}`;
+
+  document.getElementById('detailEditBtn').onclick = () => { closeModal('projetoDetailModal'); editProjeto(id); };
+  openModal('projetoDetailModal');
+}
+
+function populateClienteSelect(selectedId = '') {
+  const sel = document.getElementById('projetoClienteId');
+  const clientes = DB.getClientes().filter(c => c.status === 'fechado' || c.status === 'desenvolvimento');
+  sel.innerHTML = '<option value="">Selecione o cliente fechado...</option>' +
+    clientes.map(c=>`<option value="${c.id}" data-nome="${c.nome}" data-valor="${c.valor}" data-servico="${c.servico}" ${c.id===selectedId?'selected':''}>${c.nome}</option>`).join('');
+}
+
+function onClienteChange(sel) {
+  const opt = sel.selectedOptions[0];
+  if (opt?.value) {
+    document.getElementById('projetoValor').value = opt.getAttribute('data-valor')||'';
+    const tipo = opt.getAttribute('data-servico');
+    if (tipo) document.getElementById('projetoTipo').value = tipo;
+  }
+}
+
+function populateSelects() {
+  // Preencher tipos de projeto
+  const tipoSelect = document.getElementById('projetoTipo');
+  tipoSelect.innerHTML = '<option value="">Selecione...</option>' +
+    ['Site Institucional','Landing Page','E-commerce','Blog','Portal Web','Sistema Web','App Mobile','Redesign','Manutenção','Pacote Completo']
+      .map(t => `<option value="${t}">${t}</option>`).join('');
+  
+  // Preencher status do projeto
+  const statusSelect = document.getElementById('projetoStatus');
+  statusSelect.innerHTML = Object.entries(PROJ_STATUS)
+    .map(([v, s]) => `<option value="${v}">${s.label}</option>`).join('');
+}
+
+function openNewProjeto() {
+  document.getElementById('projetoId').value = '';
+  document.getElementById('projetoModalTitle').textContent = '📁 Novo Projeto';
+  document.getElementById('projetoForm').reset();
+  populateSelects();
+  populateClienteSelect();
+  openModal('projetoModal');
+}
+
+function editProjeto(id) {
+  const p = DB.getProjeto(id);
+  if (!p) return;
+  document.getElementById('projetoId').value = p.id;
+  document.getElementById('projetoModalTitle').textContent = '✏️ Editar Projeto';
+  populateSelects();
+  populateClienteSelect(p.clienteId);
+  document.getElementById('projetoTipo').value = p.tipo||'';
+  document.getElementById('projetoValor').value = p.valor||'';
+  document.getElementById('projetoPrazo').value = p.prazo||'';
+  document.getElementById('projetoStatus').value = p.statusProjeto||'planejamento';
+  document.getElementById('projetoProgresso').value = p.progresso||'';
+  document.getElementById('projetoObs').value = p.obs||'';
+  openModal('projetoModal');
+}
+
+function saveProjeto() {
+  const id = document.getElementById('projetoId').value;
+  const clienteEl = document.getElementById('projetoClienteId');
+  const clienteId = clienteEl.value;
+  const clienteNome = clienteEl.selectedOptions[0]?.getAttribute('data-nome')||'';
+  const statusProjeto = document.getElementById('projetoStatus').value;
+  const progresso = parseInt(document.getElementById('projetoProgresso').value) || PROJ_STATUS[statusProjeto]?.pct || 0;
+
+  const data = {
+    clienteId, clienteNome,
+    tipo: document.getElementById('projetoTipo').value,
+    valor: parseFloat(document.getElementById('projetoValor').value)||0,
+    prazo: parseInt(document.getElementById('projetoPrazo').value)||0,
+    statusProjeto,
+    progresso,
+    obs: document.getElementById('projetoObs').value,
+  };
+
+  if (!clienteId || !data.tipo || !data.valor) { toast('Preencha os campos obrigatórios!', 'error'); return; }
+
+  if (id) { DB.updateProjeto(id, data); toast('Projeto atualizado!', 'success'); }
+  else { DB.addProjeto(data); toast('Projeto criado!', 'success'); DB.addNotif(`Projeto de ${clienteNome} criado 📁`, 'info'); }
+
+  closeModal('projetoModal');
+  renderProjetos();
+}
+
+function deleteProjeto(id) {
+  confirm('Excluir este projeto? Esta ação não pode ser desfeita.', () => {
+    DB.deleteProjeto(id);
+    toast('Projeto excluído.', 'info');
+    renderPage();
+  });
+}
+</script>
+</body>
+</html>

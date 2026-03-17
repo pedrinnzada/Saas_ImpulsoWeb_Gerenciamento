@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cadastrar Cliente — Impulso Web</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<div class="app" id="app">
+  <div class="main" id="mainContent">
+    <div class="page-content" id="pageContent"></div>
+  </div>
+</div>
+
+<script src="/js/database.js"></script>
+<script src="/js/app.js"></script>
+<script src="/js/layout.js"></script>
+<script>
+let editId = null;
+
+document.addEventListener('DOMContentLoaded', () => {
+  const params = new URLSearchParams(window.location.search);
+  editId = params.get('id') || null;
+  const title = editId ? 'Editar Cliente' : 'Cadastrar Cliente';
+  injectLayout(title, editId ? 'Atualize os dados do cliente' : 'Adicione um novo cliente ou lead');
+  renderForm();
+});
+
+function renderForm() {
+  const c = editId ? DB.getCliente(editId) : null;
+  const pc = document.getElementById('pageContent');
+  pc.innerHTML = `
+    <div class="page-header">
+      <div class="breadcrumb"><span>Home</span><span><a href="/clientes.html">Clientes</a></span><span>${editId?'Editar':'Novo'} Cliente</span></div>
+      <h2>${editId ? '✏️ Editar Cliente' : '➕ Cadastrar Cliente'}</h2>
+    </div>
+
+    <div style="max-width:720px">
+      <div class="card">
+        <div class="card-header">
+          <h3>📋 Informações do Cliente</h3>
+          ${c ? `<span class="badge ${(STATUS_LABELS[c.status]||{}).cls}">${(STATUS_LABELS[c.status]||{}).label||c.status}</span>` : ''}
+        </div>
+        <div class="card-body">
+          <form id="clienteForm" novalidate>
+
+            <div class="form-section">
+              <div class="form-section-title">Dados Pessoais</div>
+              <div class="form-grid">
+                <div class="form-group">
+                  <label>Nome Completo *</label>
+                  <input type="text" id="nome" placeholder="João Silva" value="${c?.nome||''}" required>
+                </div>
+                <div class="form-group">
+                  <label>Idade</label>
+                  <input type="number" id="idade" placeholder="30" min="18" max="99" value="${c?.idade||''}">
+                </div>
+                <div class="form-group">
+                  <label>Telefone / WhatsApp *</label>
+                  <input type="tel" id="telefone" placeholder="(31) 99999-0000" value="${c?.telefone||''}">
+                </div>
+                <div class="form-group">
+                  <label>Email *</label>
+                  <input type="email" id="email" placeholder="joao@empresa.com" value="${c?.email||''}">
+                </div>
+                <div class="form-group full">
+                  <label>Empresa (opcional)</label>
+                  <input type="text" id="empresa" placeholder="Nome da empresa" value="${c?.empresa||''}">
+                </div>
+              </div>
+            </div>
+
+            <div class="form-section">
+              <div class="form-section-title">Proposta</div>
+              <div class="form-grid">
+                <div class="form-group">
+                  <label>Serviço Interessado *</label>
+                  <select id="servico">
+                    <option value="">Selecione...</option>
+                    ${['Site Institucional','Landing Page','E-commerce','Blog','Portal Web','Sistema Web','App Mobile','Redesign','Manutenção','SEO','Outro'].map(s=>`<option value="${s}" ${c?.servico===s?'selected':''}>${s}</option>`).join('')}
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label>Valor Estimado (R$)</label>
+                  <input type="number" id="valor" placeholder="3500" min="0" value="${c?.valor||''}">
+                </div>
+              </div>
+            </div>
+
+            <div class="form-section">
+              <div class="form-section-title">Classificação</div>
+              <div class="form-grid">
+                <div class="form-group">
+                  <label>Status</label>
+                  <select id="status">
+                    <option value="lead" ${(!c||c.status==='lead')?'selected':''}>🟡 Lead</option>
+                    <option value="cliente" ${c?.status==='cliente'?'selected':''}>🔵 Cliente</option>
+                    <option value="aguardando" ${c?.status==='aguardando'?'selected':''}>🟠 Aguardando Resposta</option>
+                    <option value="fechado" ${c?.status==='fechado'?'selected':''}>🟢 Fechado</option>
+                    <option value="desistente" ${c?.status==='desistente'?'selected':''}>🔴 Desistente</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label>⭐ Prioridade</label>
+                  <select id="prioridade">
+                    <option value="baixa" ${c?.prioridade==='baixa'?'selected':''}>⬇️ Baixa</option>
+                    <option value="normal" ${(!c||c.prioridade==='normal')?'selected':''}>➡️ Normal</option>
+                    <option value="alta" ${c?.prioridade==='alta'?'selected':''}>⬆️ Alta</option>
+                  </select>
+                </div>
+                <div class="form-group full">
+                  <label>Observações</label>
+                  <textarea id="obs" placeholder="Anotações sobre o cliente, preferências, histórico de contato...">${c?.obs||''}</textarea>
+                </div>
+              </div>
+            </div>
+
+            <div style="display:flex;justify-content:flex-end;gap:12px">
+              <a href="/clientes.html" class="btn btn-secondary">Cancelar</a>
+              ${c?.telefone ? `<button type="button" class="btn btn-whatsapp" onclick="openWhatsApp('${c.telefone}','${c.nome}')">💬 WhatsApp</button>` : ''}
+              <button type="submit" class="btn btn-primary btn-lg">
+                ${editId ? '💾 Salvar Alterações' : '✅ Cadastrar Cliente'}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>`;
+
+  document.getElementById('clienteForm').addEventListener('submit', saveCliente);
+}
+
+function saveCliente(e) {
+  e.preventDefault();
+  const data = {
+    nome: document.getElementById('nome').value.trim(),
+    idade: document.getElementById('idade').value,
+    telefone: document.getElementById('telefone').value.trim(),
+    email: document.getElementById('email').value.trim(),
+    empresa: document.getElementById('empresa').value.trim(),
+    servico: document.getElementById('servico').value,
+    valor: parseFloat(document.getElementById('valor').value) || 0,
+    status: document.getElementById('status').value,
+    prioridade: document.getElementById('prioridade').value,
+    obs: document.getElementById('obs').value.trim(),
+  };
+
+  if (!data.nome) { toast('Nome é obrigatório!', 'error'); return; }
+  if (!data.telefone) { toast('Telefone é obrigatório!', 'error'); return; }
+  if (!data.email) { toast('Email é obrigatório!', 'error'); return; }
+
+  if (editId) {
+    DB.updateCliente(editId, data);
+    toast('Cliente atualizado com sucesso!', 'success');
+    DB.addNotif(`Cliente ${data.nome} atualizado ✏️`, 'info');
+  } else {
+    DB.addCliente(data);
+    toast('Cliente cadastrado com sucesso!', 'success');
+    DB.addNotif(`Novo cliente: ${data.nome} cadastrado 🎉`, 'success');
+  }
+
+  setTimeout(() => window.location.href = '/clientes.html', 800);
+}
+</script>
+</body>
+</html>
