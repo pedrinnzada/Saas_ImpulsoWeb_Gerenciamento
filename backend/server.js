@@ -9,7 +9,10 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 
 // Middleware
-app.use(cors({ origin: 'http://localhost' })); // Adjust for prod
+app.use(cors({ 
+  origin: process.env.NODE_ENV === 'production' ? '*' : 'http://localhost:3000',
+  credentials: true 
+})); // Prod: all origins, local: frontend
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
@@ -17,8 +20,15 @@ app.use(express.urlencoded({ extended: true }));
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api', require('./routes/api'));
 
+// Root redirect
+app.get('/', (req, res) => res.redirect('/health'));
+
 // Health check
-app.get('/health', (req, res) => res.json({ status: 'OK', timestamp: new Date().toISOString() }));
+app.get('/health', (req, res) => res.json({ 
+  status: 'OK', 
+  timestamp: new Date().toISOString(),
+  env: process.env.NODE_ENV 
+})); 
 
 // 404
 app.use('*', (req, res) => res.status(404).json({ error: 'Route not found' }));

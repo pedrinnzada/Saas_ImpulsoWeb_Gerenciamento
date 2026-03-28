@@ -1,34 +1,23 @@
-# Impulso Web Full-Stack Migration Plan
-Status: 🟢 Backend Complete | Progress: 11/18 | 2024
+# Impulso Web Render Postgres Deployment
+Status: 🟡 In Progress | 0/12
 
-## Backend ✓ (1-8)
-- [x] 1-7: Structure, models (User/Cliente/Projeto/Reuniao/Notification), controllers, routes/middleware
-- [ ] 8. User Setup: 
-  1. Edit `backend/.env` → `DB_PASSWORD=your_mysql_root_pass`
-  2. `mysql -u root -p < schema.sql` (create DB)
-  3. `cd backend && npm i && node server.js`
-  4. Test: http://localhost:3001/health
+## Approved Plan Steps:
 
-## Frontend Migration (9-14) ⏳ NEXT
-- [ ] 9. js/api.js (fetch wrapper + endpoints)
-- [ ] 10. Update js/login.js (API login/register)
-- [ ] 11. New: cadastro-usuario.html + js/register.js
-- [ ] 12. AUTH.require() → token check in js/app.js/layout.js
-- [ ] 13. All pages: DB.* → api.* (clientes/projetos/reunioes)
-- [ ] 14. Add loading/errors + auto-seed empty DB
+### 1. Prep Files (3 steps)
+- [x] Update backend/config/database.js (port 5432, no defaults)\n- [x] Create postgres_schema.sql (converted schema + seed)\n- [x] Update backend/package.json (remove mysql2, Render scripts)
 
-## Final (15-18)
-- [ ] 15. README.md (Postman, run guide)
-- [ ] 16. Multi-device test
-- [ ] 17. Seed demo data endpoint
-- [ ] 18. Complete
+### 2. Backend Fixes (3 steps)\n- [x] Update backend/server.js (CORS '*', root health)\n- [x] Create backend/.env.example (Render vars)\n- [x] Minor models fixes if needed (NOW()→CURRENT_TIMESTAMP) # pg compatible
 
-**Backend Test Commands:**
-```
-# Login
-curl -X POST http://localhost:3001/api/auth/login -H "Content-Type: application/json" -d '{\"email\":\"admin@iw.com\",\"password\":\"admin123\"}'
+### 3. Git & Deploy (3 steps)
+- [ ] git init, create GitHub repo, push backend/
+- [ ] Render: New Web Service, set DB_* env vars
+- [ ] Render Postgres: Run postgres_schema.sql
 
-# CRUD clientes (with token)
-curl -X GET http://localhost:3001/api/clientes -H "Authorization: Bearer TOKEN"
-```
+### 4. Test (3 steps)
+- [ ] Local test: Docker pg or Render /health
+- [ ] API test: POST /api/auth/login
+- [ ] Update README.md, Frontend URLs to Render URL
+- [ ] Mark complete
+
+Next: File updates starting with database.js and schema.
 

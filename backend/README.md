@@ -1,13 +1,40 @@
 # Impulso Web Backend
 
-## Setup
-1. Edit `.env`:
-   ```
-   DB_PASSWORD=your_mysql_root_password
-   ```
-2. Create DB: `mysql -u root -p < ../schema.sql`
-3. `npm install`
-4. `npm start` (port 3001)
+## Local Setup (MySQL)
+1. Edit `.env`: DB_PASSWORD=your_mysql_pass
+2. `mysql -u root -p < ../schema.sql`
+3. `npm i && npm start`
+
+## Render Postgres Deploy (Recommended)
+1. **GitHub Repo**: 
+   - cd backend
+   - git add . && git commit -m "Initial Postgres ready"
+   - git remote add origin https://github.com/YOURUSER/impulso-web-backend.git
+   - git push -u origin main
+
+2. **Render Web Service**:
+   - render.com → New Web Service → Connect GitHub repo
+   - Node, Build: npm install, Start: npm start
+   - Env vars (from .env.example):
+     DB_HOST=dpg-d73h9pkg9agc738666tg-a
+     DB_USER=impulso_web_user
+     DB_PASSWORD=4Eb9xSyX7Koxx6gRDHjIxUvGKKkfvuMk
+     DB_NAME=impulso_web
+     DB_PORT=5432
+     JWT_SECRET=change_to_strong_secret_32chars_min
+     NODE_ENV=production
+
+3. **DB Setup**:
+   - Render Dashboard → Your Postgres → Console
+   - Paste/run postgres_schema.sql (root: ../postgres_schema.sql)
+   - Update admin hash if needed: node ../seed_admin.js (local), copy UPDATE
+
+4. **Test**: https://your-app.onrender.com/health → OK
+
+API same, frontend JS: change localhost:3001 → your-render-url/api
+
+Postman/curl same with Render URL + Bearer token.
+
 
 ## API Docs
 **Base**: `http://localhost:3001`
