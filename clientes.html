@@ -108,7 +108,10 @@ async function renderClients() {
   // sort by priority then date
   clientes.sort((a,b) => {
     const po = {alta:0,normal:1,baixa:2};
-    return (po[a.prioridade]||1) - (po[b.prioridade]||1);
+    const prioA = po[a.prioridade] ?? 1;
+    const prioB = po[b.prioridade] ?? 1;
+    if (prioA !== prioB) return prioA - prioB;
+    return new Date(b.dataCadastro) - new Date(a.dataCadastro);
   });
 
   const total = clientes.length;

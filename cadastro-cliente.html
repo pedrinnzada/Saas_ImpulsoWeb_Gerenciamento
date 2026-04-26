@@ -152,11 +152,13 @@ async function saveCliente(e) {
   if (!data.email) { toast('Email é obrigatório!', 'error'); return; }
 
   if (editId) {
-    await DB.updateCliente(editId, data);
+    const ok = await DB.updateCliente(editId, data);
+    if (ok === false) { toast('Erro ao atualizar cliente. Tente novamente.', 'error'); return; }
     toast('Cliente atualizado com sucesso!', 'success');
     await DB.addNotif(`Cliente ${data.nome} atualizado ✏️`, 'info');
   } else {
-    await DB.addCliente(data);
+    const res = await DB.addCliente(data);
+    if (!res) { toast('Erro ao cadastrar cliente. Verifique os dados e tente novamente.', 'error'); return; }
     toast('Cliente cadastrado com sucesso!', 'success');
     await DB.addNotif(`Novo cliente: ${data.nome} cadastrado 🎉`, 'success');
   }

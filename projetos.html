@@ -314,11 +314,19 @@ async function saveProjeto() {
 
   if (!clienteId || !data.tipo || !data.valor) { toast('Preencha os campos obrigatórios!', 'error'); return; }
 
-  if (id) { await DB.updateProjeto(id, data); toast('Projeto atualizado!', 'success'); }
-  else { await DB.addProjeto(data); toast('Projeto criado!', 'success'); await DB.addNotif(`Projeto de ${clienteNome} criado 📁`, 'info'); }
+  if (id) {
+    const ok = await DB.updateProjeto(id, data);
+    if (ok === false) { toast('Erro ao atualizar projeto.', 'error'); return; }
+    toast('Projeto atualizado!', 'success');
+  } else {
+    const res = await DB.addProjeto(data);
+    if (!res) { toast('Erro ao criar projeto.', 'error'); return; }
+    toast('Projeto criado!', 'success');
+    await DB.addNotif(`Projeto de ${clienteNome} criado 📁`, 'info');
+  }
 
   closeModal('projetoModal');
-  await renderProjetos();
+  await renderPage();
 }
 
 async function deleteProjeto(id) {

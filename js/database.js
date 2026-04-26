@@ -24,26 +24,27 @@ const DB = {
     const user = AUTH.current();
     if (!user) return null;
     
-    const { data: record, error } = await _supabase.from('clientes').insert([{
+    const insertData = {
       user_id: user.id,
       nome: data.nome,
-      idade: data.idade,
+      idade: data.idade ? parseInt(data.idade) : null,
       telefone: data.telefone,
       email: data.email,
       empresa: data.empresa,
       servico: data.servico,
-      valor: data.valor,
+      valor: data.valor ? parseFloat(data.valor) : 0,
       obs: data.obs,
       status: data.status || 'lead',
       prioridade: data.prioridade || 'normal'
-    }]).select().single();
+    };
+
+    const { data: record, error } = await _supabase.from('clientes').insert([insertData]).select().single();
     
     if (error) { console.error('Erro addCliente:', error); return null; }
     return { ...record, dataCadastro: record.data_cadastro };
   },
   async updateCliente(id, data) {
     if (!_supabase) return;
-    // Map frontend fields back to DB fields
     const updateData = {};
     if (data.status) updateData.status = data.status;
     if (data.prioridade) updateData.prioridade = data.prioridade;
@@ -52,11 +53,13 @@ const DB = {
     if (data.telefone) updateData.telefone = data.telefone;
     if (data.empresa) updateData.empresa = data.empresa;
     if (data.servico) updateData.servico = data.servico;
-    if (data.valor !== undefined) updateData.valor = data.valor;
+    if (data.valor !== undefined) updateData.valor = data.valor ? parseFloat(data.valor) : 0;
+    if (data.idade !== undefined) updateData.idade = data.idade ? parseInt(data.idade) : null;
     if (data.obs !== undefined) updateData.obs = data.obs;
 
     const { error } = await _supabase.from('clientes').update(updateData).eq('id', id);
-    if (error) console.error('Erro updateCliente:', error);
+    if (error) { console.error('Erro updateCliente:', error); return false; }
+    return true;
   },
   async deleteCliente(id) {
     if (!_supabase) return;
@@ -97,9 +100,10 @@ const DB = {
     return record;
   },
   async updateReuniao(id, data) {
-    if (!_supabase) return;
+    if (!_supabase) return false;
     const { error } = await _supabase.from('reunioes').update(data).eq('id', id);
-    if (error) console.error('Erro updateReuniao:', error);
+    if (error) { console.error('Erro updateReuniao:', error); return false; }
+    return true;
   },
   async deleteReuniao(id) {
     if (!_supabase) return;
@@ -122,17 +126,18 @@ const DB = {
   async addProjeto(data) {
     if (!_supabase) return null;
     const user = AUTH.current();
-    const { data: record, error } = await _supabase.from('projetos').insert([{
+    const insertData = {
       user_id: user.id,
       cliente_id: data.clienteId,
       cliente_nome: data.clienteNome,
       tipo: data.tipo,
-      valor: data.valor,
-      prazo: data.prazo,
+      valor: data.valor ? parseFloat(data.valor) : 0,
+      prazo: data.prazo ? parseInt(data.prazo) : null,
       status_projeto: data.statusProjeto || 'planejamento',
-      progresso: data.progresso || 0,
+      progresso: data.progresso ? parseInt(data.progresso) : 0,
       obs: data.obs
-    }]).select().single();
+    };
+    const { data: record, error } = await _supabase.from('projetos').insert([insertData]).select().single();
     if (error) { console.error('Erro addProjeto:', error); return null; }
     return record;
   },
@@ -143,8 +148,13 @@ const DB = {
       updateData.status_projeto = data.statusProjeto;
       delete updateData.statusProjeto;
     }
+    if (data.valor !== undefined) updateData.valor = data.valor ? parseFloat(data.valor) : 0;
+    if (data.prazo !== undefined) updateData.prazo = data.prazo ? parseInt(data.prazo) : null;
+    if (data.progresso !== undefined) updateData.progresso = data.progresso ? parseInt(data.progresso) : 0;
+
     const { error } = await _supabase.from('projetos').update(updateData).eq('id', id);
-    if (error) console.error('Erro updateProjeto:', error);
+    if (error) { console.error('Erro updateProjeto:', error); return false; }
+    return true;
   },
   async deleteProjeto(id) {
     if (!_supabase) return;
