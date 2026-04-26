@@ -79,18 +79,19 @@
   </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="/js/database.js"></script>
 <script src="/js/app.js"></script>
 <script src="/js/layout.js"></script>
 <script>
-document.addEventListener('DOMContentLoaded', () => {
-  injectLayout('Projetos', 'Acompanhe o andamento dos projetos');
-  renderPage();
+document.addEventListener('DOMContentLoaded', async () => {
+  await injectLayout('Projetos', 'Acompanhe o andamento dos projetos');
+  await renderPage();
 });
 
-function renderPage() {
+async function renderPage() {
   const pc = document.getElementById('pageContent');
-  const projetos = DB.getProjetos();
+  const projetos = await DB.getProjetos();
   const totalValor = projetos.reduce((a,p) => a + Number(p.valor||0), 0);
   const entregues = projetos.filter(p => p.statusProjeto === 'entregue').length;
   const emAndamento = projetos.filter(p => p.statusProjeto !== 'entregue').length;
@@ -112,14 +113,13 @@ function renderPage() {
     </div>
 
     <div id="projetosGrid" class="clients-grid"></div>
-    ${!projetos.length ? `<div class="empty-state"><div class="empty-icon">📁</div><p>Nenhum projeto cadastrado.<br>Marque um cliente como \"Fechado\" para criar um projeto.</p><a href="/clientes.html" class="btn btn-primary" style="margin-top:16px">Ver Clientes</a></div>` : ''}`;
+    ${!projetos.length ? `<div class="empty-state"><div class="empty-icon">📁</div><p>Nenhum projeto cadastrado.<br>Marque um cliente como "Fechado" para criar um projeto.</p><a href="/clientes.html" class="btn btn-primary" style="margin-top:16px">Ver Clientes</a></div>` : ''}`;
 
-
-  renderProjetos();
+  await renderProjetos();
 }
 
-function renderProjetos() {
-  const projetos = DB.getProjetos();
+async function renderProjetos() {
+  const projetos = await DB.getProjetos();
   const grid = document.getElementById('projetosGrid');
   if (!grid) return;
   grid.innerHTML = projetos.map(projetoCard).join('');
@@ -181,8 +181,8 @@ function projetoCard(p) {
   </div>`;
 }
 
-function viewProjeto(id) {
-  const p = DB.getProjeto(id);
+async function viewProjeto(id) {
+  const p = await DB.getProjeto(id);
   if (!p) return;
   const steps = Object.keys(PROJ_STATUS);
   const currentIdx = steps.indexOf(p.statusProjeto);
@@ -240,9 +240,9 @@ function viewProjeto(id) {
   openModal('projetoDetailModal');
 }
 
-function populateClienteSelect(selectedId = '') {
+async function populateClienteSelect(selectedId = '') {
   const sel = document.getElementById('projetoClienteId');
-  const clientes = DB.getClientes().filter(c => c.status === 'fechado' || c.status === 'desenvolvimento');
+  const clientes = (await DB.getClientes()).filter(c => c.status === 'fechado' || c.status === 'desenvolvimento');
   sel.innerHTML = '<option value="">Selecione o cliente fechado...</option>' +
     clientes.map(c=>`<option value="${c.id}" data-nome="${c.nome}" data-valor="${c.valor}" data-servico="${c.servico}" ${c.id===selectedId?'selected':''}>${c.nome}</option>`).join('');
 }
@@ -269,32 +269,32 @@ function populateSelects() {
     .map(([v, s]) => `<option value="${v}">${s.label}</option>`).join('');
 }
 
-function openNewProjeto() {
+async function openNewProjeto() {
   document.getElementById('projetoId').value = '';
   document.getElementById('projetoModalTitle').textContent = '📁 Novo Projeto';
   document.getElementById('projetoForm').reset();
   populateSelects();
-  populateClienteSelect();
+  await populateClienteSelect();
   openModal('projetoModal');
 }
 
-function editProjeto(id) {
-  const p = DB.getProjeto(id);
+async function editProjeto(id) {
+  const p = await DB.getProjeto(id);
   if (!p) return;
   document.getElementById('projetoId').value = p.id;
   document.getElementById('projetoModalTitle').textContent = '✏️ Editar Projeto';
   populateSelects();
-  populateClienteSelect(p.clienteId);
+  await populateClienteSelect(p.cliente_id || p.clienteId);
   document.getElementById('projetoTipo').value = p.tipo||'';
   document.getElementById('projetoValor').value = p.valor||'';
   document.getElementById('projetoPrazo').value = p.prazo||'';
-  document.getElementById('projetoStatus').value = p.statusProjeto||'planejamento';
+  document.getElementById('projetoStatus').value = p.status_projeto || p.statusProjeto || 'planejamento';
   document.getElementById('projetoProgresso').value = p.progresso||'';
   document.getElementById('projetoObs').value = p.obs||'';
   openModal('projetoModal');
 }
 
-function saveProjeto() {
+async function saveProjeto() {
   const id = document.getElementById('projetoId').value;
   const clienteEl = document.getElementById('projetoClienteId');
   const clienteId = clienteEl.value;
@@ -314,18 +314,18 @@ function saveProjeto() {
 
   if (!clienteId || !data.tipo || !data.valor) { toast('Preencha os campos obrigatórios!', 'error'); return; }
 
-  if (id) { DB.updateProjeto(id, data); toast('Projeto atualizado!', 'success'); }
-  else { DB.addProjeto(data); toast('Projeto criado!', 'success'); DB.addNotif(`Projeto de ${clienteNome} criado 📁`, 'info'); }
+  if (id) { await DB.updateProjeto(id, data); toast('Projeto atualizado!', 'success'); }
+  else { await DB.addProjeto(data); toast('Projeto criado!', 'success'); await DB.addNotif(`Projeto de ${clienteNome} criado 📁`, 'info'); }
 
   closeModal('projetoModal');
-  renderProjetos();
+  await renderProjetos();
 }
 
-function deleteProjeto(id) {
-  confirm('Excluir este projeto? Esta ação não pode ser desfeita.', () => {
-    DB.deleteProjeto(id);
+async function deleteProjeto(id) {
+  confirm('Excluir este projeto? Esta ação não pode ser desfeita.', async () => {
+    await DB.deleteProjeto(id);
     toast('Projeto excluído.', 'info');
-    renderPage();
+    await renderPage();
   });
 }
 </script>

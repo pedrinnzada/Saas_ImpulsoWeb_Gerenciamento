@@ -23,7 +23,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     await new Promise(r => setTimeout(r, 700)); // simulate async
 
-    const user = AUTH.login(email, senha);
+    const user = await AUTH.login(email, senha);
     if (user) {
       btnText.textContent = '✓ Bem-vindo!';
       await new Promise(r => setTimeout(r, 400));

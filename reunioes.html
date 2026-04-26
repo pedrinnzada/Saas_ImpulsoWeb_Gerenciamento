@@ -63,21 +63,22 @@
   </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="/js/database.js"></script>
 <script src="/js/app.js"></script>
 <script src="/js/layout.js"></script>
 <script>
 let calYear, calMonth;
 
-document.addEventListener('DOMContentLoaded', () => {
-  injectLayout('Reuniões', 'Gerencie seus agendamentos');
+document.addEventListener('DOMContentLoaded', async () => {
+  await injectLayout('Reuniões', 'Gerencie seus agendamentos');
   const now = new Date();
   calYear = now.getFullYear();
   calMonth = now.getMonth();
-  renderPage();
+  await renderPage();
 });
 
-function renderPage() {
+async function renderPage() {
   const pc = document.getElementById('pageContent');
   pc.innerHTML = `
     <div class="page-header">
@@ -127,13 +128,14 @@ function renderPage() {
       </div>
     </div>`;
 
-  populateClienteSelect();
-  renderReunioes();
-  renderCalendar();
+  await populateClienteSelect();
+  await renderReunioes();
+  await renderCalendar();
 }
 
-function renderReunioes() {
-  const reunioes = DB.getReunioes().sort((a,b) => new Date(a.data+' '+a.horario) - new Date(b.data+' '+b.horario));
+async function renderReunioes() {
+  const rawReunioes = await DB.getReunioes();
+  const reunioes = rawReunioes.sort((a,b) => new Date(a.data+' '+a.horario) - new Date(b.data+' '+b.horario));
   const today = new Date().toISOString().slice(0,10);
 
   const upcoming = reunioes.filter(r => r.data >= today).slice(0,5);
@@ -200,9 +202,9 @@ function renderReunioes() {
     </div>`).join('')}`;
 }
 
-function renderCalendar() {
+async function renderCalendar() {
   const calEl = document.getElementById('miniCal');
-  const reunioes = DB.getReunioes();
+  const reunioes = await DB.getReunioes();
   const eventDates = new Set(reunioes.map(r => r.data));
   const today = new Date();
 
@@ -232,16 +234,16 @@ function renderCalendar() {
   calEl.innerHTML = html;
 }
 
-function changeMonth(dir) {
+async function changeMonth(dir) {
   calMonth += dir;
   if (calMonth > 11) { calMonth = 0; calYear++; }
   if (calMonth < 0) { calMonth = 11; calYear--; }
-  renderCalendar();
+  await renderCalendar();
 }
 
-function populateClienteSelect() {
+async function populateClienteSelect() {
   const sel = document.getElementById('reuniaoClienteId');
-  const clientes = DB.getClientes().sort((a,b)=>a.nome.localeCompare(b.nome));
+  const clientes = (await DB.getClientes()).sort((a,b)=>a.nome.localeCompare(b.nome));
   sel.innerHTML = '<option value="">Selecione o cliente...</option>' +
     clientes.map(c=>`<option value="${c.id}" data-nome="${c.nome}">${c.nome} ${c.empresa?'('+c.empresa+')':''}</option>`).join('');
 }
@@ -254,12 +256,13 @@ function openNewReuniao() {
   openModal('reuniaoModal');
 }
 
-function editReuniao(id) {
-  const r = DB.getReunioes().find(x=>x.id===id);
+async function editReuniao(id) {
+  const rawReunioes = await DB.getReunioes();
+  const r = rawReunioes.find(x=>x.id===id);
   if (!r) return;
   document.getElementById('reuniaoId').value = r.id;
   document.getElementById('reuniaoModalTitle').textContent = '✏️ Editar Reunião';
-  document.getElementById('reuniaoClienteId').value = r.clienteId;
+  document.getElementById('reuniaoClienteId').value = r.cliente_id || r.clienteId;
   document.getElementById('reuniaoData').value = r.data;
   document.getElementById('reuniaoHorario').value = r.horario;
   document.getElementById('reuniaoTipo').value = r.tipo;
@@ -268,7 +271,7 @@ function editReuniao(id) {
   openModal('reuniaoModal');
 }
 
-function saveReuniao() {
+async function saveReuniao() {
   const id = document.getElementById('reuniaoId').value;
   const clienteEl = document.getElementById('reuniaoClienteId');
   const clienteId = clienteEl.value;
@@ -282,19 +285,19 @@ function saveReuniao() {
     obs: document.getElementById('reuniaoObs').value,
   };
   if (!clienteId || !data.data || !data.horario) { toast('Preencha os campos obrigatórios!', 'error'); return; }
-  if (id) { DB.updateReuniao(id, data); toast('Reunião atualizada!', 'success'); }
-  else { DB.addReuniao(data); toast('Reunião agendada!', 'success'); DB.addNotif(`Reunião com ${clienteNome} agendada 📅`, 'info'); }
+  if (id) { await DB.updateReuniao(id, data); toast('Reunião atualizada!', 'success'); }
+  else { await DB.addReuniao(data); toast('Reunião agendada!', 'success'); await DB.addNotif(`Reunião com ${clienteNome} agendada 📅`, 'info'); }
   closeModal('reuniaoModal');
-  renderReunioes();
-  renderCalendar();
+  await renderReunioes();
+  await renderCalendar();
 }
 
-function deleteReuniao(id) {
-  confirm('Excluir esta reunião?', () => {
-    DB.deleteReuniao(id);
+async function deleteReuniao(id) {
+  confirm('Excluir esta reunião?', async () => {
+    await DB.deleteReuniao(id);
     toast('Reunião removida.', 'info');
-    renderReunioes();
-    renderCalendar();
+    await renderReunioes();
+    await renderCalendar();
   });
 }
 </script>

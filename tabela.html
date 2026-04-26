@@ -13,6 +13,7 @@
   </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="/js/database.js"></script>
 <script src="/js/app.js"></script>
 <script src="/js/layout.js"></script>
@@ -20,12 +21,12 @@
 let filter = 'all', search = '', page = 1, sort = { col: 'dataCadastro', dir: -1 };
 const PER_PAGE = 12;
 
-document.addEventListener('DOMContentLoaded', () => {
-  injectLayout('Tabela Geral', 'Visão completa de todos os clientes');
-  renderPage();
+document.addEventListener('DOMContentLoaded', async () => {
+  await injectLayout('Tabela Geral', 'Visão completa de todos os clientes');
+  await renderPage();
 });
 
-function renderPage() {
+async function renderPage() {
   const pc = document.getElementById('pageContent');
   pc.innerHTML = `
     <div class="page-header">
@@ -78,11 +79,11 @@ function renderPage() {
       </div>
       <div id="paginationEl" style="padding:12px 20px"></div>
     </div>`;
-  renderTable();
+  await renderTable();
 }
 
-function renderTable() {
-  let clientes = DB.getClientes();
+async function renderTable() {
+  let clientes = await DB.getClientes();
   if (filter !== 'all') clientes = clientes.filter(c => c.status === filter);
   if (search) {
     const q = search.toLowerCase();
@@ -155,23 +156,23 @@ function renderTable() {
   } else { pagEl.innerHTML = ''; }
 }
 
-function onSearch(v) { search = v; page = 1; renderTable(); }
-function onFilter(v) { filter = v; page = 1; renderTable(); }
-function goPage(p) { page = p; renderTable(); window.scrollTo(0,0); }
-function sortBy(col) {
+async function onSearch(v) { search = v; page = 1; await renderTable(); }
+async function onFilter(v) { filter = v; page = 1; await renderTable(); }
+async function goPage(p) { page = p; await renderTable(); window.scrollTo(0,0); }
+async function sortBy(col) {
   sort = sort.col === col ? { col, dir: -sort.dir } : { col, dir: 1 };
-  renderTable();
+  await renderTable();
 }
-function deleteCliente(id) {
-  const c = DB.getCliente(id);
-  confirm(`Excluir o cliente <strong>${c?.nome}</strong>?`, () => {
-    DB.deleteCliente(id);
+async function deleteCliente(id) {
+  const c = await DB.getCliente(id);
+  confirm(`Excluir o cliente <strong>${c?.nome}</strong>?`, async () => {
+    await DB.deleteCliente(id);
     toast('Cliente excluído!', 'info');
-    renderTable();
+    await renderTable();
   });
 }
-function exportarCSV() {
-  const clientes = DB.getClientes();
+async function exportarCSV() {
+  const clientes = await DB.getClientes();
   const data = clientes.map(c => ({
     Nome: c.nome, Email: c.email||'', Telefone: c.telefone||'',
     Empresa: c.empresa||'', Servico: c.servico||'', Valor: c.valor||0,

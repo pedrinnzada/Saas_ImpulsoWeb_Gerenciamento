@@ -1,12 +1,12 @@
 // ============================================================
 // IMPULSO WEB — Shared Layout Injector
 // ============================================================
-function injectLayout(pageTitle, pageSubtitle) {
+async function injectLayout(pageTitle, pageSubtitle) {
   requireAuth();
   const user = AUTH.current();
   const avatarLetter = (user?.nome || 'A')[0];
 
-  const sidebar = `
+  const sidebarHtml = `
   <div class="sidebar-overlay" id="sidebarOverlay"></div>
   <aside class="sidebar" id="sidebar">
     <div class="sidebar-header">
@@ -67,7 +67,7 @@ function injectLayout(pageTitle, pageSubtitle) {
     </div>
   </aside>`;
 
-  const topbar = `
+  const topbarHtml = `
   <header class="topbar">
     <div class="topbar-left">
       <div class="menu-toggle" id="menuToggle">☰</div>
@@ -98,9 +98,9 @@ function injectLayout(pageTitle, pageSubtitle) {
   const app = document.getElementById('app');
   const mainEl = document.getElementById('mainContent');
   if (app && mainEl) {
-    app.insertAdjacentHTML('afterbegin', sidebar);
-    mainEl.insertAdjacentHTML('afterbegin', topbar);
+    app.insertAdjacentHTML('afterbegin', sidebarHtml);
+    mainEl.insertAdjacentHTML('afterbegin', topbarHtml);
   }
 
-  initSidebar();
+  await initSidebar();
 }

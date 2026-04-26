@@ -1,156 +1,220 @@
 // ============================================================
-// IMPULSO WEB — Database (LocalStorage)
+// IMPULSO WEB — Database (Supabase)
 // ============================================================
 
-const DB = {
-  // ── helpers ──────────────────────────────────────────────
-  get(key) {
-    try { return JSON.parse(localStorage.getItem(key)) || []; }
-    catch { return []; }
-  },
-  set(key, value) {
-    localStorage.setItem(key, JSON.stringify(value));
-  },
-  id() {
-    return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
-  },
+const SUPABASE_URL = 'https://qsnmcewjmsrkukqslboa.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFzbm1jZXdqbXNya3VrcXNsYm9hIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcyMTc4MzksImV4cCI6MjA5Mjc5MzgzOX0.IqQcQmCDHPbAWCrrHnLMubr15DTbPPd43QqwvjjvRZM';
 
+const _supabase = typeof supabase !== 'undefined' ? supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null;
+
+const DB = {
   // ── CLIENTES ─────────────────────────────────────────────
-  getClientes() { return this.get('iw_clientes'); },
-  saveClientes(list) { this.set('iw_clientes', list); },
-  addCliente(data) {
-    const list = this.getClientes();
-    const cliente = {
-      id: this.id(),
-      dataCadastro: new Date().toISOString(),
-      status: 'lead',
-      prioridade: 'normal',
-      ...data
-    };
-    list.push(cliente);
-    this.saveClientes(list);
-    return cliente;
+  async getClientes() {
+    if (!_supabase) return [];
+    const { data, error } = await _supabase.from('clientes').select('*').order('data_cadastro', { ascending: false });
+    if (error) { console.error('Erro getClientes:', error); return []; }
+    // Map database fields to frontend fields if necessary
+    return (data || []).map(c => ({
+      ...c,
+      dataCadastro: c.data_cadastro // compatibility with old frontend
+    }));
   },
-  updateCliente(id, data) {
-    const list = this.getClientes().map(c => c.id === id ? { ...c, ...data } : c);
-    this.saveClientes(list);
+  async addCliente(data) {
+    if (!_supabase) return null;
+    const user = AUTH.current();
+    if (!user) return null;
+    
+    const { data: record, error } = await _supabase.from('clientes').insert([{
+      user_id: user.id,
+      nome: data.nome,
+      idade: data.idade,
+      telefone: data.telefone,
+      email: data.email,
+      empresa: data.empresa,
+      servico: data.servico,
+      valor: data.valor,
+      obs: data.obs,
+      status: data.status || 'lead',
+      prioridade: data.prioridade || 'normal'
+    }]).select().single();
+    
+    if (error) { console.error('Erro addCliente:', error); return null; }
+    return { ...record, dataCadastro: record.data_cadastro };
   },
-  deleteCliente(id) {
-    this.saveClientes(this.getClientes().filter(c => c.id !== id));
+  async updateCliente(id, data) {
+    if (!_supabase) return;
+    // Map frontend fields back to DB fields
+    const updateData = {};
+    if (data.status) updateData.status = data.status;
+    if (data.prioridade) updateData.prioridade = data.prioridade;
+    if (data.nome) updateData.nome = data.nome;
+    if (data.email) updateData.email = data.email;
+    if (data.telefone) updateData.telefone = data.telefone;
+    if (data.empresa) updateData.empresa = data.empresa;
+    if (data.servico) updateData.servico = data.servico;
+    if (data.valor !== undefined) updateData.valor = data.valor;
+    if (data.obs !== undefined) updateData.obs = data.obs;
+
+    const { error } = await _supabase.from('clientes').update(updateData).eq('id', id);
+    if (error) console.error('Erro updateCliente:', error);
   },
-  getCliente(id) {
-    return this.getClientes().find(c => c.id === id);
+  async deleteCliente(id) {
+    if (!_supabase) return;
+    const { error } = await _supabase.from('clientes').delete().eq('id', id);
+    if (error) console.error('Erro deleteCliente:', error);
+  },
+  async getCliente(id) {
+    if (!_supabase) return null;
+    const { data, error } = await _supabase.from('clientes').select('*').eq('id', id).single();
+    if (error) { console.error('Erro getCliente:', error); return null; }
+    return { ...data, dataCadastro: data.data_cadastro };
   },
 
   // ── REUNIÕES ─────────────────────────────────────────────
-  getReunioes() { return this.get('iw_reunioes'); },
-  saveReunioes(list) { this.set('iw_reunioes', list); },
-  addReuniao(data) {
-    const list = this.getReunioes();
-    const reuniao = { id: this.id(), ...data };
-    list.push(reuniao);
-    this.saveReunioes(list);
-    return reuniao;
+  async getReunioes() {
+    if (!_supabase) return [];
+    const { data, error } = await _supabase.from('reunioes').select('*').order('data', { ascending: true });
+    if (error) { console.error('Erro getReunioes:', error); return []; }
+    return (data || []).map(r => ({
+      ...r,
+      clienteNome: r.cliente_nome // compatibility
+    }));
   },
-  updateReuniao(id, data) {
-    const list = this.getReunioes().map(r => r.id === id ? { ...r, ...data } : r);
-    this.saveReunioes(list);
+  async addReuniao(data) {
+    if (!_supabase) return null;
+    const user = AUTH.current();
+    const { data: record, error } = await _supabase.from('reunioes').insert([{
+      user_id: user.id,
+      cliente_id: data.clienteId,
+      cliente_nome: data.clienteNome,
+      data: data.data,
+      horario: data.horario,
+      tipo: data.tipo,
+      link: data.link,
+      obs: data.obs
+    }]).select().single();
+    if (error) { console.error('Erro addReuniao:', error); return null; }
+    return record;
   },
-  deleteReuniao(id) {
-    this.saveReunioes(this.getReunioes().filter(r => r.id !== id));
+  async updateReuniao(id, data) {
+    if (!_supabase) return;
+    const { error } = await _supabase.from('reunioes').update(data).eq('id', id);
+    if (error) console.error('Erro updateReuniao:', error);
+  },
+  async deleteReuniao(id) {
+    if (!_supabase) return;
+    const { error } = await _supabase.from('reunioes').delete().eq('id', id);
+    if (error) console.error('Erro deleteReuniao:', error);
   },
 
   // ── PROJETOS ─────────────────────────────────────────────
-  getProjetos() { return this.get('iw_projetos'); },
-  saveProjetos(list) { this.set('iw_projetos', list); },
-  addProjeto(data) {
-    const list = this.getProjetos();
-    const projeto = {
-      id: this.id(),
-      dataInicio: new Date().toISOString(),
-      statusProjeto: 'planejamento',
-      progresso: 0,
-      ...data
-    };
-    list.push(projeto);
-    this.saveProjetos(list);
-    return projeto;
+  async getProjetos() {
+    if (!_supabase) return [];
+    const { data, error } = await _supabase.from('projetos').select('*').order('data_inicio', { ascending: false });
+    if (error) { console.error('Erro getProjetos:', error); return []; }
+    return (data || []).map(p => ({
+      ...p,
+      clienteNome: p.cliente_nome,
+      statusProjeto: p.status_projeto,
+      dataInicio: p.data_inicio
+    }));
   },
-  updateProjeto(id, data) {
-    const list = this.getProjetos().map(p => p.id === id ? { ...p, ...data } : p);
-    this.saveProjetos(list);
+  async addProjeto(data) {
+    if (!_supabase) return null;
+    const user = AUTH.current();
+    const { data: record, error } = await _supabase.from('projetos').insert([{
+      user_id: user.id,
+      cliente_id: data.clienteId,
+      cliente_nome: data.clienteNome,
+      tipo: data.tipo,
+      valor: data.valor,
+      prazo: data.prazo,
+      status_projeto: data.statusProjeto || 'planejamento',
+      progresso: data.progresso || 0,
+      obs: data.obs
+    }]).select().single();
+    if (error) { console.error('Erro addProjeto:', error); return null; }
+    return record;
   },
-  deleteProjeto(id) {
-    this.saveProjetos(this.getProjetos().filter(p => p.id !== id));
+  async updateProjeto(id, data) {
+    if (!_supabase) return;
+    const updateData = { ...data };
+    if (data.statusProjeto) {
+      updateData.status_projeto = data.statusProjeto;
+      delete updateData.statusProjeto;
+    }
+    const { error } = await _supabase.from('projetos').update(updateData).eq('id', id);
+    if (error) console.error('Erro updateProjeto:', error);
   },
-  getProjeto(id) {
-    return this.getProjetos().find(p => p.id === id);
+  async deleteProjeto(id) {
+    if (!_supabase) return;
+    const { error } = await _supabase.from('projetos').delete().eq('id', id);
+    if (error) console.error('Erro deleteProjeto:', error);
+  },
+  async getProjeto(id) {
+    if (!_supabase) return null;
+    const { data, error } = await _supabase.from('projetos').select('*').eq('id', id).single();
+    if (error) { console.error('Erro getProjeto:', error); return null; }
+    return { ...data, clienteNome: data.cliente_nome, status_projeto: data.status_projeto };
   },
 
   // ── NOTIFICAÇÕES ─────────────────────────────────────────
-  getNotifs() { return this.get('iw_notifs'); },
-  addNotif(msg, type = 'info') {
-    const list = this.getNotifs();
-    list.unshift({ id: this.id(), msg, type, ts: new Date().toISOString(), read: false });
-    this.set('iw_notifs', list.slice(0, 20));
+  async getNotifs() {
+    if (!_supabase) return [];
+    const { data, error } = await _supabase.from('notifications').select('*').order('ts', { ascending: false }).limit(20);
+    if (error) { console.error('Erro getNotifs:', error); return []; }
+    return data || [];
   },
-  markNotifsRead() {
-    this.set('iw_notifs', this.getNotifs().map(n => ({ ...n, read: true })));
+  async addNotif(msg, type = 'info') {
+    if (!_supabase) return;
+    const user = AUTH.current();
+    if (!user) return;
+    const { error } = await _supabase.from('notifications').insert([{ user_id: user.id, msg, type }]);
+    if (error) console.error('Erro addNotif:', error);
+  },
+  async markNotifsRead() {
+    if (!_supabase) return;
+    const user = AUTH.current();
+    const { error } = await _supabase.from('notifications').update({ read: true }).eq('user_id', user.id).eq('read', false);
+    if (error) console.error('Erro markNotifsRead:', error);
   },
 
-  // ── SEED (dados demo) ─────────────────────────────────────
-  seed() {
-    if (this.getClientes().length > 0) return;
-    const clientes = [
-      { nome: 'Lucas Ferreira', idade: 32, telefone: '31999001122', email: 'lucas@empresa.com', empresa: 'Ferreira Tech', servico: 'Site Institucional', valor: 3500, status: 'fechado', prioridade: 'alta', obs: 'Cliente VIP, indicação do João.' },
-      { nome: 'Mariana Costa', idade: 28, telefone: '31988002233', email: 'mari@boutique.com', empresa: 'Boutique Mari', servico: 'E-commerce', valor: 8900, status: 'desenvolvimento', prioridade: 'alta', obs: 'Quer loja completa com pagamento.' },
-      { nome: 'Roberto Alves', idade: 45, telefone: '31977003344', email: 'roberto@alves.adv', empresa: 'Alves Advocacia', servico: 'Landing Page', valor: 1800, status: 'aguardando', prioridade: 'normal', obs: 'Aguardando aprovação do orçamento.' },
-      { nome: 'Patrícia Lima', idade: 38, telefone: '31966004455', email: 'pati@clinica.com.br', empresa: 'Clínica Lima', servico: 'Site Institucional', valor: 2900, status: 'lead', prioridade: 'normal', obs: 'Primeiro contato via Instagram.' },
-      { nome: 'Carlos Mendes', idade: 25, telefone: '31955005566', email: 'carlos@startup.io', empresa: 'StartupXYZ', servico: 'Sistema Web', valor: 15000, status: 'lead', prioridade: 'alta', obs: 'Startup em fase de captação.' },
-      { nome: 'Fernanda Souza', idade: 30, telefone: '31944006677', email: 'fe@restaurante.com', empresa: 'Restaurante Sabores', servico: 'Landing Page', valor: 1200, status: 'desistente', prioridade: 'baixa', obs: 'Achou o valor alto.' },
-    ];
-    clientes.forEach(c => {
-      const cli = this.addCliente(c);
-      if (c.status === 'fechado') {
-        this.addProjeto({
-          clienteId: cli.id,
-          clienteNome: c.nome,
-          tipo: c.servico,
-          valor: c.valor,
-          prazo: 30,
-          statusProjeto: 'desenvolvimento',
-          progresso: 45,
-        });
-      }
-    });
-
-    const hoje = new Date();
-    const amanha = new Date(hoje); amanha.setDate(amanha.getDate() + 1);
-    const depois = new Date(hoje); depois.setDate(depois.getDate() + 3);
-    this.addReuniao({ clienteId: this.getClientes()[0]?.id, clienteNome: 'Lucas Ferreira', data: amanha.toISOString().slice(0,10), horario: '10:00', tipo: 'online', link: 'https://meet.google.com/abc-def', obs: 'Apresentar layout final.' });
-    this.addReuniao({ clienteId: this.getClientes()[1]?.id, clienteNome: 'Mariana Costa', data: amanha.toISOString().slice(0,10), horario: '14:30', tipo: 'presencial', obs: 'Visita ao estabelecimento.' });
-    this.addReuniao({ clienteId: this.getClientes()[2]?.id, clienteNome: 'Roberto Alves', data: depois.toISOString().slice(0,10), horario: '09:00', tipo: 'online', link: 'https://zoom.us/xyz', obs: 'Apresentação do orçamento revisado.' });
-
-    this.addNotif('Bem-vindo ao Impulso Web! 🚀', 'success');
-    this.addNotif('Você tem 3 reuniões esta semana 📅', 'info');
-    this.addNotif('Projeto de Lucas Ferreira em andamento ⚙️', 'info');
+  // ── SEED (disabled for Supabase) ──────────────────────────
+  async seed() {
+    console.log('Seed disabled for Supabase mode.');
   }
 };
 
-// ── Autenticação ──────────────────────────────────────────
+// ── Autenticação (Supabase) ───────────────────────────────
 const AUTH = {
-  users: [
-    { email: 'admin@iw.com', senha: 'admin123', nome: 'Admin', role: 'admin' }
-  ],
-  login(email, senha) {
-    const user = this.users.find(u => u.email === email && u.senha === senha);
-    if (user) {
-      sessionStorage.setItem('iw_user', JSON.stringify(user));
-      return user;
-    }
-    return null;
+  async login(email, password) {
+    if (!_supabase) return null;
+    const { data, error } = await _supabase.auth.signInWithPassword({ email, password });
+    if (error) { console.error('Erro login:', error.message); return null; }
+    
+    const user = {
+      id: data.user.id,
+      email: data.user.email,
+      nome: data.user.user_metadata.full_name || data.user.email.split('@')[0],
+      role: 'user'
+    };
+    sessionStorage.setItem('iw_user', JSON.stringify(user));
+    return user;
   },
-  logout() { sessionStorage.removeItem('iw_user'); },
+  async signup(email, password, nome) {
+    if (!_supabase) return null;
+    const { data, error } = await _supabase.auth.signUp({
+      email,
+      password,
+      options: { data: { full_name: nome } }
+    });
+    if (error) { console.error('Erro signup:', error.message); return null; }
+    return data.user;
+  },
+  async logout() {
+    if (_supabase) await _supabase.auth.signOut();
+    sessionStorage.removeItem('iw_user');
+  },
   current() {
     try { return JSON.parse(sessionStorage.getItem('iw_user')); }
     catch { return null; }
@@ -160,7 +224,7 @@ const AUTH = {
   }
 };
 
-// Utility helpers
+// Utility helpers (sync)
 const FMT = {
   currency(v) {
     return 'R$ ' + Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
@@ -199,3 +263,4 @@ const PRIORIDADE = {
   normal: { label: '➡️ Normal', cls: 'prio-normal' },
   alta: { label: '⬆️ Alta', cls: 'prio-alta' },
 };
+

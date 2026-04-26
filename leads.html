@@ -14,17 +14,18 @@
   </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="/js/database.js"></script>
 <script src="/js/app.js"></script>
 <script src="/js/layout.js"></script>
 <script>
-document.addEventListener('DOMContentLoaded', () => {
-  injectLayout('Leads', 'Acompanhe a conversão de leads');
-  renderPage();
+document.addEventListener('DOMContentLoaded', async () => {
+  await injectLayout('Leads', 'Acompanhe a conversão de leads');
+  await renderPage();
 });
 
-function renderPage() {
-  const clientes = DB.getClientes();
+async function renderPage() {
+  const clientes = await DB.getClientes();
   const leads = clientes.filter(c => c.status === 'lead');
   const aguardando = clientes.filter(c => c.status === 'aguardando');
   const fechados = clientes.filter(c => c.status === 'fechado');

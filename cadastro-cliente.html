@@ -13,22 +13,23 @@
   </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="/js/database.js"></script>
 <script src="/js/app.js"></script>
 <script src="/js/layout.js"></script>
 <script>
 let editId = null;
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
   const params = new URLSearchParams(window.location.search);
   editId = params.get('id') || null;
   const title = editId ? 'Editar Cliente' : 'Cadastrar Cliente';
-  injectLayout(title, editId ? 'Atualize os dados do cliente' : 'Adicione um novo cliente ou lead');
-  renderForm();
+  await injectLayout(title, editId ? 'Atualize os dados do cliente' : 'Adicione um novo cliente ou lead');
+  await renderForm();
 });
 
-function renderForm() {
-  const c = editId ? DB.getCliente(editId) : null;
+async function renderForm() {
+  const c = editId ? await DB.getCliente(editId) : null;
   const pc = document.getElementById('pageContent');
   pc.innerHTML = `
     <div class="page-header">
@@ -131,7 +132,7 @@ function renderForm() {
   document.getElementById('clienteForm').addEventListener('submit', saveCliente);
 }
 
-function saveCliente(e) {
+async function saveCliente(e) {
   e.preventDefault();
   const data = {
     nome: document.getElementById('nome').value.trim(),
@@ -151,13 +152,13 @@ function saveCliente(e) {
   if (!data.email) { toast('Email é obrigatório!', 'error'); return; }
 
   if (editId) {
-    DB.updateCliente(editId, data);
+    await DB.updateCliente(editId, data);
     toast('Cliente atualizado com sucesso!', 'success');
-    DB.addNotif(`Cliente ${data.nome} atualizado ✏️`, 'info');
+    await DB.addNotif(`Cliente ${data.nome} atualizado ✏️`, 'info');
   } else {
-    DB.addCliente(data);
+    await DB.addCliente(data);
     toast('Cliente cadastrado com sucesso!', 'success');
-    DB.addNotif(`Novo cliente: ${data.nome} cadastrado 🎉`, 'success');
+    await DB.addNotif(`Novo cliente: ${data.nome} cadastrado 🎉`, 'success');
   }
 
   setTimeout(() => window.location.href = '/clientes.html', 800);

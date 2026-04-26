@@ -43,7 +43,7 @@ function confirm(msg, onYes) {
 }
 
 // ── Sidebar ───────────────────────────────────────────────
-function initSidebar() {
+async function initSidebar() {
   const sidebar = document.getElementById('sidebar');
   if (!sidebar) return;
 
@@ -85,27 +85,28 @@ function initSidebar() {
   }
 
   // Notifications
-  updateNotifBadge();
+  await updateNotifBadge();
   const notifBtn = document.getElementById('notifBtn');
   const notifDrop = document.getElementById('notifDropdown');
   if (notifBtn && notifDrop) {
-    notifBtn.addEventListener('click', (e) => {
+    notifBtn.addEventListener('click', async (e) => {
       e.stopPropagation();
       notifDrop.classList.toggle('open');
-      if (notifDrop.classList.contains('open')) renderNotifs();
+      if (notifDrop.classList.contains('open')) await renderNotifs();
     });
     document.addEventListener('click', () => notifDrop.classList.remove('open'));
     notifDrop.addEventListener('click', e => e.stopPropagation());
-    document.querySelector('[data-mark-read]')?.addEventListener('click', () => {
-      DB.markNotifsRead();
-      updateNotifBadge();
-      renderNotifs();
+    document.querySelector('[data-mark-read]')?.addEventListener('click', async () => {
+      await DB.markNotifsRead();
+      await updateNotifBadge();
+      await renderNotifs();
     });
   }
 }
 
-function updateNotifBadge() {
-  const unread = DB.getNotifs().filter(n => !n.read).length;
+async function updateNotifBadge() {
+  const notifs = await DB.getNotifs();
+  const unread = notifs.filter(n => !n.read).length;
   const badge = document.getElementById('notifBadge');
   if (badge) {
     badge.textContent = unread;
@@ -113,10 +114,10 @@ function updateNotifBadge() {
   }
 }
 
-function renderNotifs() {
+async function renderNotifs() {
   const list = document.getElementById('notifList');
   if (!list) return;
-  const notifs = DB.getNotifs();
+  const notifs = await DB.getNotifs();
   if (!notifs.length) {
     list.innerHTML = '<div class="empty-state" style="padding:24px"><p>Sem notificações</p></div>';
     return;

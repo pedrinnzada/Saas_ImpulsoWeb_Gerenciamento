@@ -42,6 +42,7 @@
   </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="/js/database.js"></script>
 <script src="/js/app.js"></script>
 <script src="/js/layout.js"></script>
@@ -51,12 +52,12 @@ let searchTerm = '';
 let currentPage = 1;
 const PER_PAGE = 9;
 
-document.addEventListener('DOMContentLoaded', () => {
-  injectLayout('Clientes', 'Gerencie sua base de clientes');
-  renderPage();
+document.addEventListener('DOMContentLoaded', async () => {
+  await injectLayout('Clientes', 'Gerencie sua base de clientes');
+  await renderPage();
 });
 
-function renderPage() {
+async function renderPage() {
   const pc = document.getElementById('pageContent');
   pc.innerHTML = `
     <div class="page-header">
@@ -89,11 +90,11 @@ function renderPage() {
     <div id="clientsContainer"></div>
     <div id="paginationContainer"></div>
   `;
-  renderClients();
+  await renderClients();
 }
 
-function renderClients() {
-  let clientes = DB.getClientes();
+async function renderClients() {
+  let clientes = await DB.getClientes();
   if (currentFilter !== 'all') clientes = clientes.filter(c => c.status === currentFilter);
   if (searchTerm) {
     const q = searchTerm.toLowerCase();
@@ -170,24 +171,24 @@ function clientCard(c) {
   </div>`;
 }
 
-function setFilter(f) {
+async function setFilter(f) {
   currentFilter = f;
   currentPage = 1;
-  renderPage();
+  await renderPage();
 }
-function onSearch(v) {
+async function onSearch(v) {
   searchTerm = v;
   currentPage = 1;
-  renderClients();
+  await renderClients();
 }
-function goPage(p) {
+async function goPage(p) {
   currentPage = p;
-  renderClients();
+  await renderClients();
   window.scrollTo(0, 0);
 }
 
-function viewClient(id) {
-  const c = DB.getCliente(id);
+async function viewClient(id) {
+  const c = await DB.getCliente(id);
   if (!c) return;
   const st = STATUS_LABELS[c.status] || {};
   const pr = PRIORIDADE[c.prioridade] || PRIORIDADE.normal;
@@ -231,8 +232,8 @@ function viewClient(id) {
   openModal('viewModal');
 }
 
-function openStatusModal(id) {
-  const c = DB.getCliente(id);
+async function openStatusModal(id) {
+  const c = await DB.getCliente(id);
   if (!c) return;
   document.getElementById('statusClienteName').textContent = c.nome;
   const statuses = [
@@ -249,31 +250,31 @@ function openStatusModal(id) {
   openModal('statusModal');
 }
 
-function updateStatus(id, status) {
-  DB.updateCliente(id, { status });
+async function updateStatus(id, status) {
+  await DB.updateCliente(id, { status });
   closeModal('statusModal');
   if (status === 'fechado') {
-    const c = DB.getCliente(id);
-    DB.addNotif(`${c.nome} marcado como Fechado! 🎉`, 'success');
+    const c = await DB.getCliente(id);
+    await DB.addNotif(`${c.nome} marcado como Fechado! 🎉`, 'success');
     toast(`${c.nome} marcado como Fechado! 🎉 Agora você pode criar um projeto.`, 'success');
   } else {
     toast('Status atualizado!', 'success');
   }
-  renderClients();
+  await renderClients();
 }
 
-function deleteCliente(id) {
-  const c = DB.getCliente(id);
+async function deleteCliente(id) {
+  const c = await DB.getCliente(id);
   if (!c) return;
-  confirm(`Excluir o cliente <strong>${c.nome}</strong>? Esta ação não pode ser desfeita.`, () => {
-    DB.deleteCliente(id);
+  confirm(`Excluir o cliente <strong>${c.nome}</strong>? Esta ação não pode ser desfeita.`, async () => {
+    await DB.deleteCliente(id);
     toast('Cliente excluído!', 'info');
-    renderClients();
+    await renderClients();
   });
 }
 
-function exportarCSV() {
-  const clientes = DB.getClientes();
+async function exportarCSV() {
+  const clientes = await DB.getClientes();
   const data = clientes.map(c => ({
     Nome: c.nome, Email: c.email||'', Telefone: c.telefone||'',
     Empresa: c.empresa||'', Servico: c.servico||'', Valor: c.valor||0,
